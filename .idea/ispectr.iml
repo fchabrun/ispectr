@@ -5,7 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/R" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/python" isTestSource="false" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="py311_torch21gpu_oct24_statants" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

@@ -138,3 +138,76 @@ drawProcessedSPE <- function(y, use_ggplot = TRUE) {
     plot(y~x, data.frame(x = c(1:length(y)), y = y), type = 'l')
   }
 }
+
+na_padding_end <- function(vect, total_length) {
+  if (length(vect) == total_length) {
+    return(vect)
+  }
+  if (length(vect) > total_length) {
+    stop("Length of vector exceeds expected total length")
+  }
+  return(c(vect, rep(NA, total_length - length(vect))))
+}
+
+zero_padding_balanced <- function(vect, total_length) {
+  if (length(vect) == total_length) {
+    return(vect)
+  }
+  if (length(vect) > total_length) {
+    stop("Length of vector exceeds expected total length")
+  }
+  padding_total = total_length - length(vect)
+  padding_left = round(padding_total / 2)
+  padding_right = padding_total - padding_left
+  list(new_vect=c(rep(0, padding_left), vect, rep(0, padding_right)), padding_left=padding_left)
+}
+
+convert_to_spep_matrix <- function(db_full, normalize_01=TRUE, spep_extend_size=304, italiano=T) {
+  require(progress)
+
+  n_cols_spep = spep_extend_size
+  if (is.na(n_cols_spep)) {
+    n_cols_spep <- 300
+  }
+  n_cols_fractions = 10
+  n_cols_peaks = 10
+  n_cols_alertflag = 1
+  n_cols_total = n_cols_spep + n_cols_fractions + n_cols_peaks + n_cols_alertflag
+  # create our data matrix
+  spe_matrix = matrix(data=NA, nrow=nrow(db_full), ncol=n_cols_total)  # total number of entries for one line
+  # create progress bar
+  pb <- progress_bar$new(total = nrow(db_full))
+  for (i in 1:nrow(db_full)) {
+    # extract SPEP data
+    tmp <- decipherCurve_v2024_2(db_full[i, ], italiano=italiano)
+    if (!is.na(spep_extend_size) && (spep_extend_size > 0)) {
+      padded_curve <- zero_padding_balanced(tmp$curve, total_length = spep_extend_size)
+      tmp$curve <- zero_padding_balanced(tmp$curve, total_length = spep_extend_size)$new_vect
+      tmp$fractions_coords <- tmp$fractions_coords + padded_curve$padding_left
+      tmp$peaks_coords <- tmp$peaks_coords + padded_curve$padding_left
+    }
+    if (normalize_01) {
+      tmp$curve <- (tmp$curve - min(tmp$curve)) / (max(tmp$curve) - min(tmp$curve))
+    }
+
+    # fill data into a new line
+    matrix_new_line <- c(na_padding_end(tmp$curve, n_cols_spep),
+                         na_padding_end(tmp$fractions_coords, n_cols_fractions),  # 6 fractions + up to 3 fractions - 1 + 2 (first & last delimiters)
+                         na_padding_end(tmp$peaks_coords, n_cols_peaks),  # up to 5 peaks (?)
+                         tmp$alertflag)
+    # save
+    spe_matrix[i, ] <- matrix_new_line
+    # update progress bar
+    pb$tick()
+  }
+
+  # turn into data.frame, change column names, add identification number and save
+  spe_df = data.frame(spe_matrix)
+  # change column names
+  colnames(spe_df) <- c(paste0("x", 1:n_cols_spep),
+                        paste0("f", 1:n_cols_fractions),
+                        paste0("p", 1:n_cols_peaks),
+                        "alert_flag")
+  # add id and other columns
+  spe_df
+}
