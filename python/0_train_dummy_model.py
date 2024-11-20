@@ -109,7 +109,7 @@ if debug_plots:
 # TODO instead of using grouped convolutions with 1D model, we may want to try using regular convolutions with a 2D model? (1 channel, but height = 6)
 # TODO limit with this solution => 2nd dimension will move over "channels" (IgG/A/M/k/l) always in the same order so consider that "some IgG pattern" close to some "IgA pattern" and not "IgG" right before "Kappa" for instance... so maybe not the best solution?
 
-# TODO segmentation instead of 
+# TODO segmentation instead of classification
 
 # instanciate our first model
 model = SupervisedModule(n_classes=2,  # 2 output neurons => igg vs no igg
