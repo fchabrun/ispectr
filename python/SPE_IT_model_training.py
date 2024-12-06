@@ -5,8 +5,6 @@ date : 22/11/2024
 Training segmentation models for immunosubtraction data
 #############################################################################"""
 
-
-
 """=============================================================================
 Imports
 ============================================================================="""
@@ -35,22 +33,31 @@ import lightning as pl
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import CSVLogger
 
-#%%
+import os
+
+root_data_path = None
+if "flori" in os.listdir(r"C:\Users"):
+    root_data_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\data\proc\lemans_2018"
+    output_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\output"
+elif "afors" in os.listdir(r"C:\Users"):
+    root_data_path = r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018"
+    # where to write everything
+    output_path = r"C:\Users\afors\Documents\Projects\SPE_IT\output"
+assert root_data_path is not None, "Unknown user"
+
+# %%
 """=============================================================================
 Paths and data loading
 ============================================================================="""
-
-# where to write everything
-output_path = r"C:\Users\afors\Documents\Projects\SPE_IT\output"
 
 # load Le Mans data
 
 # load x array
 # data is already normalized between 0-1 and zero-padded to a 304 width
-if_x = np.load(r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018\if_v1_x.npy")
+if_x = np.load(os.path.join(root_data_path, "if_v1_x.npy"))
 
 # load y array
-if_y = np.load(r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018\if_v1_y.npy")
+if_y = np.load(os.path.join(root_data_path, "if_v1_y.npy"))
 
 # note: we should create .h5 files to easily load the data using a data manager if we have a lot of samples!
 
@@ -71,7 +78,6 @@ if debug_plots:
     plt.tight_layout()
     plt.show()
 
-
 # %%
 """=============================================================================
 Data splitting and dataloader setup
@@ -79,28 +85,27 @@ Data splitting and dataloader setup
 
 # we'll output the proportion of each class in the dataset (so we'll check if random partitioning works fine)
 if debug_plots:
-    print('IgG% : ', round(if_y[..., 0].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)),2), '\n',
-          'IgA% : ', round(if_y[..., 1].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)),2), '\n',
-          'IgM% : ', round(if_y[..., 2].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)),2), '\n',
-          'Kappa% : ', round(if_y[..., 3].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)),2), '\n',
+    print('IgG% : ', round(if_y[..., 0].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)), 2), '\n',
+          'IgA% : ', round(if_y[..., 1].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)), 2), '\n',
+          'IgM% : ', round(if_y[..., 2].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)), 2), '\n',
+          'Kappa% : ', round(if_y[..., 3].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)), 2), '\n',
           'Lambda% : ', round(if_y[..., 4].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)), 2))
-
 
 # partition
 if_x_train, if_x_test, if_y_train, if_y_test = train_test_split(if_x, if_y, test_size=.2, random_state=1, shuffle=True,
-                                                                                      )
+                                                                )
 
 if debug_plots:
-    print('IgG% train : ', round(if_y_train[..., 0].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)),2), '\n',
-          'IgA% train : ', round(if_y_train[..., 1].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)),2), '\n',
-          'IgM% train : ', round(if_y_train[..., 2].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)),2), '\n',
-          'Kappa% train : ', round(if_y_train[..., 3].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)),2), '\n',
+    print('IgG% train : ', round(if_y_train[..., 0].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2), '\n',
+          'IgA% train : ', round(if_y_train[..., 1].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2), '\n',
+          'IgM% train : ', round(if_y_train[..., 2].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2), '\n',
+          'Kappa% train : ', round(if_y_train[..., 3].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2), '\n',
           'Lambda% train : ', round(if_y_train[..., 4].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2))
 
-    print('IgG% test : ', round(if_y_test[..., 0].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)),2), '\n',
-          'IgA% test : ', round(if_y_test[..., 1].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)),2), '\n',
-          'IgM% test : ', round(if_y_test[..., 2].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)),2), '\n',
-          'Kappa% test : ', round(if_y_test[..., 3].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)),2), '\n',
+    print('IgG% test : ', round(if_y_test[..., 0].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)), 2), '\n',
+          'IgA% test : ', round(if_y_test[..., 1].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)), 2), '\n',
+          'IgM% test : ', round(if_y_test[..., 2].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)), 2), '\n',
+          'Kappa% test : ', round(if_y_test[..., 3].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)), 2), '\n',
           'Lambda% test : ', round(if_y_test[..., 4].max(axis=1).sum() / len(if_y_test[..., 0].max(axis=1)), 2))
 
 # seems well stratified
@@ -143,6 +148,7 @@ if debug_plots:
 """=============================================================================
 Model instantiation
 ============================================================================="""
+
 
 # TODO pré-entraîner modèle sur une autre tâche
 # TODO masquer les pics pour forcer le modèle à regarder autour de l'albumine (expliquer à Xavier!)
@@ -212,30 +218,30 @@ class SegformerConfig:
     model_type = "segformer"
 
     def __init__(
-        self,
-        num_channels=3,
-        num_encoder_blocks=4,
-        depths=[2, 2, 2, 2],
-        sr_ratios=[8, 4, 2, 1],
-        hidden_sizes=[32, 64, 160, 256],
-        patch_sizes=[7, 3, 3, 3],
-        strides=[4, 2, 2, 2],
-        num_attention_heads=[1, 2, 5, 8],
-        mlp_ratios=[4, 4, 4, 4],
-        hidden_act="gelu",
-        hidden_dropout_prob=0.0,
-        attention_probs_dropout_prob=0.0,
-        classifier_dropout_prob=0.1,
-        initializer_range=0.02,
-        drop_path_rate=0.1,
-        layer_norm_eps=1e-6,
-        decoder_hidden_size=256,
-        semantic_loss_ignore_index=255,
-        num_labels = 0,
-        use_return_dict = True,
-        output_hidden_states = True,
-        output_attentions = False
-        ,
+            self,
+            num_channels=3,
+            num_encoder_blocks=4,
+            depths=[2, 2, 2, 2],
+            sr_ratios=[8, 4, 2, 1],
+            hidden_sizes=[32, 64, 160, 256],
+            patch_sizes=[7, 3, 3, 3],
+            strides=[4, 2, 2, 2],
+            num_attention_heads=[1, 2, 5, 8],
+            mlp_ratios=[4, 4, 4, 4],
+            hidden_act="gelu",
+            hidden_dropout_prob=0.0,
+            attention_probs_dropout_prob=0.0,
+            classifier_dropout_prob=0.1,
+            initializer_range=0.02,
+            drop_path_rate=0.1,
+            layer_norm_eps=1e-6,
+            decoder_hidden_size=256,
+            semantic_loss_ignore_index=255,
+            num_labels=0,
+            use_return_dict=True,
+            output_hidden_states=True,
+            output_attentions=False
+            ,
     ):
         super().__init__()
 
@@ -261,7 +267,6 @@ class SegformerConfig:
         self.use_return_dict = use_return_dict
         self.output_hidden_states = output_hidden_states
         self.output_attentions = output_attentions
-
 
 
 class ModelOutput(OrderedDict):
@@ -306,9 +311,9 @@ class ModelOutput(OrderedDict):
             if first_field_iterator:
                 for idx, element in enumerate(iterator):
                     if (
-                        not isinstance(element, (list, tuple))
-                        or not len(element) == 2
-                        or not isinstance(element[0], str)
+                            not isinstance(element, (list, tuple))
+                            or not len(element) == 2
+                            or not isinstance(element[0], str)
                     ):
                         if idx == 0:
                             # If we do not have an iterator of key/values, set it as attribute
@@ -368,7 +373,6 @@ class ModelOutput(OrderedDict):
         return tuple(self[k] for k in self.keys())
 
 
-
 @dataclass
 class BaseModelOutput(ModelOutput):
     """
@@ -393,6 +397,7 @@ class BaseModelOutput(ModelOutput):
     last_hidden_state: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
     attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
+
 
 @dataclass
 class SemanticSegmenterOutput(ModelOutput):
@@ -430,7 +435,6 @@ class SemanticSegmenterOutput(ModelOutput):
     logits: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
     attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
-
 
 
 # Copied from transformers.models.beit.modeling_beit.drop_path
@@ -488,7 +492,7 @@ class SegformerOverlapPatchEmbeddings(nn.Module):
         length = pixel_values.shape[1]
         pixel_values = pixel_values.transpose(1, 2)
         embeddings = self.proj(pixel_values)
-        #_, _, length = embeddings.shape
+        # _, _, length = embeddings.shape
         # base impl : (batch_size, num_channels, height, width) -> (batch_size, num_channels, height*width) -> (batch_size, height*width, num_channels)
         # but we already have a sequence without height and width so we don't need to apply  flatten(2) to embeddings
         # this can be fed to a Transformer layer
@@ -501,7 +505,7 @@ class SegformerEfficientSelfAttention(nn.Module):
     """SegFormer's efficient self-attention mechanism. Employs the sequence reduction process introduced in the [PvT
     paper](https://arxiv.org/abs/2102.12122)."""
 
-    def __init__(self, config, hidden_size, num_attention_heads, sequence_reduction_ratio = 1):
+    def __init__(self, config, hidden_size, num_attention_heads, sequence_reduction_ratio=1):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_attention_heads = num_attention_heads
@@ -534,9 +538,9 @@ class SegformerEfficientSelfAttention(nn.Module):
         return hidden_states.permute(0, 2, 1, 3)
 
     def forward(
-        self,
-        hidden_states,
-        output_attentions=False,
+            self,
+            hidden_states,
+            output_attentions=False,
     ):
         query_layer = self.transpose_for_scores(self.query(hidden_states))
 
@@ -589,7 +593,7 @@ class SegformerSelfOutput(nn.Module):
 
 
 class SegformerAttention(nn.Module):
-    def __init__(self, config, hidden_size, num_attention_heads, sequence_reduction_ratio = 1):
+    def __init__(self, config, hidden_size, num_attention_heads, sequence_reduction_ratio=1):
         super().__init__()
         self.self = SegformerEfficientSelfAttention(
             config=config,
@@ -598,7 +602,6 @@ class SegformerAttention(nn.Module):
             sequence_reduction_ratio=sequence_reduction_ratio,
         )
         self.output = SegformerSelfOutput(config, hidden_size=hidden_size)
-
 
     def forward(self, hidden_states, output_attentions):
         self_outputs = self.self(hidden_states, output_attentions)
@@ -644,7 +647,7 @@ class SegformerMixFFN(nn.Module):
 class SegformerLayer(nn.Module):
     """This corresponds to the Block class in the original implementation."""
 
-    def __init__(self, config, hidden_size, num_attention_heads, drop_path, mlp_ratio, sequence_reduction_ratio = 1):
+    def __init__(self, config, hidden_size, num_attention_heads, drop_path, mlp_ratio, sequence_reduction_ratio=1):
         super().__init__()
         self.layer_norm_1 = nn.LayerNorm(hidden_size)
         self.attention = SegformerAttention(
@@ -732,18 +735,17 @@ class SegformerEncoder(nn.Module):
         )
 
     def forward(
-        self,
-        pixel_values: torch.FloatTensor,
-        output_attentions: Optional[bool] = False,
-        output_hidden_states: Optional[bool] = False,
-        return_dict: Optional[bool] = True,
-        stage_1_patch=False
+            self,
+            pixel_values: torch.FloatTensor,
+            output_attentions: Optional[bool] = False,
+            output_hidden_states: Optional[bool] = False,
+            return_dict: Optional[bool] = True,
+            stage_1_patch=False
     ) -> Union[Tuple, BaseModelOutput]:
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
 
-
-        #batch_size = pixel_values.shape[0]
+        # batch_size = pixel_values.shape[0]
 
         hidden_states = pixel_values
 
@@ -761,14 +763,13 @@ class SegformerEncoder(nn.Module):
             # third, apply layer norm
             hidden_states = norm_layer(hidden_states)
             # fourth, optionally reshape back to (batch_size, num_channels, height, width)
-            #if idx != len(self.patch_embeddings) - 1 or (
+            # if idx != len(self.patch_embeddings) - 1 or (
             #        idx == len(self.patch_embeddings) - 1 and self.config.reshape_last_stage
-            #):
+            # ):
             #    hidden_states = hidden_states.reshape(batch_size, height, width, -1).permute(0, 3, 1,
             #                                                                                 2).contiguous()
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
-
 
         if not return_dict:
             return tuple(v for v in [hidden_states, all_hidden_states, all_self_attentions] if v is not None)
@@ -777,6 +778,7 @@ class SegformerEncoder(nn.Module):
             hidden_states=all_hidden_states,
             attentions=all_self_attentions,
         )
+
 
 class SegformerModel(nn.Module):
     def __init__(self, config):
@@ -787,11 +789,11 @@ class SegformerModel(nn.Module):
         self.encoder = SegformerEncoder(config)
 
     def forward(
-        self,
-        pixel_values: torch.FloatTensor,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+            self,
+            pixel_values: torch.FloatTensor,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutput]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -815,7 +817,6 @@ class SegformerModel(nn.Module):
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
         )
-
 
 
 class SegformerMLP(nn.Module):
@@ -863,7 +864,7 @@ class SegformerDecodeHead(nn.Module):
 
         all_hidden_states = ()
         for encoder_hidden_state, mlp in zip(encoder_hidden_states, self.linear_c):
-            #if self.config.reshape_last_stage is False and encoder_hidden_state.ndim == 3:
+            # if self.config.reshape_last_stage is False and encoder_hidden_state.ndim == 3:
             #    height = width = int(math.sqrt(encoder_hidden_state.shape[-1]))
             #    encoder_hidden_state = (
             #        encoder_hidden_state.reshape(batch_size, height, width, -1).permute(0, 3, 1, 2).contiguous()
@@ -873,7 +874,7 @@ class SegformerDecodeHead(nn.Module):
             length = encoder_hidden_state.shape[1]
             encoder_hidden_state = mlp(encoder_hidden_state)
             encoder_hidden_state = encoder_hidden_state.permute(0, 2, 1)
-            #encoder_hidden_state = encoder_hidden_state.reshape(batch_size, -1, length)
+            # encoder_hidden_state = encoder_hidden_state.reshape(batch_size, -1, length)
             # upsample
             print(encoder_hidden_state.shape)
             encoder_hidden_state = nn.functional.interpolate(
@@ -919,12 +920,12 @@ class IsSegformer(nn.Module):
             module.weight.data.fill_(1.0)
 
     def forward(
-        self,
-        pixel_values: torch.FloatTensor,
-        labels: Optional[torch.LongTensor] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+            self,
+            pixel_values: torch.FloatTensor,
+            labels: Optional[torch.LongTensor] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
     ) -> Union[Tuple, SemanticSegmenterOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, height, width)`, *optional*):
@@ -942,7 +943,7 @@ class IsSegformer(nn.Module):
         if labels is not None and self.config.num_labels < 1:
             raise ValueError(f"Number of labels should be >=0: {self.config.num_labels}")
 
-        pixel_values = pixel_values.squeeze(dim=2).transpose(1,2)
+        pixel_values = pixel_values.squeeze(dim=2).transpose(1, 2)
         outputs = self.segformer(
             pixel_values,
             output_attentions=output_attentions,
@@ -957,17 +958,19 @@ class IsSegformer(nn.Module):
         loss = None
         if labels is not None:
             # upsample logits to the images' original size => not needed here
-            #upsampled_logits = nn.functional.interpolate(
+            # upsampled_logits = nn.functional.interpolate(
             #    logits, size=labels.shape[-2:], mode="bilinear", align_corners=False
-            #)
+            # )
             if self.config.num_labels > 1:
                 loss_fct = nn.BCEWithLogitsLoss()
-                loss = loss_fct(logits, labels.transpose(1,2))
+                loss = loss_fct(logits, labels.transpose(1, 2))
             elif self.config.num_labels == 1:
                 valid_mask = ((labels >= 0) & (labels != self.config.semantic_loss_ignore_index)).float()
                 loss_fct = nn.BCEWithLogitsLoss(reduction="none")
                 loss = loss_fct(logits.squeeze(1), labels.float())
                 loss = (loss * valid_mask).mean()
+        else:
+            print("Labels are none")
 
         if not return_dict:
             if output_hidden_states:
@@ -984,11 +987,11 @@ class IsSegformer(nn.Module):
         )
 
 
-
 # %%
 """=============================================================================
 Model training
 ============================================================================="""
+
 
 class pl_IS_model(pl.LightningModule):
     def __init__(self, model,
@@ -1015,30 +1018,29 @@ class pl_IS_model(pl.LightningModule):
         self.y_true = []
         self.y_pred = []
 
-
     def forward(self, batch):
         if type(batch) in (tuple, list):
             x, y = batch
         else:
-            x = batch
-        outputs = self.model(x)
+            assert False, "Need labels"
+        outputs = self.model(pixel_values=x, labels=y)
         return outputs.logits
 
     def training_step(self, batch, batch_idx):
         x, y = batch
         outputs = self.model(x)
-        #self.log("train_loss", outputs.loss)
-        y_true=[]
-        y_pred=[]
-        #print([outputs.logits[i].shape for i in range(4)], [outputs.loss[i].shape for i in range(4)], [outputs.hidden_states[i].shape for i in range(4)])
+        # self.log("train_loss", outputs.loss)
+        y_true = []
+        y_pred = []
+        # print([outputs.logits[i].shape for i in range(4)], [outputs.loss[i].shape for i in range(4)], [outputs.hidden_states[i].shape for i in range(4)])
         return outputs.loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         val_outputs = self.model(x)
 
-        #print(y.shape, val_outputs.logits.shape)
-        self.y_true.append(y.transpose(1,2))
+        # print(y.shape, val_outputs.logits.shape)
+        self.y_true.append(y.transpose(1, 2))
         self.y_pred.append(val_outputs.logits)
         print([self.y_true[i].shape for i in range(len(self.y_true))], [self.y_pred[i].shape for i in range(len(self.y_pred))])
 
@@ -1049,10 +1051,10 @@ class pl_IS_model(pl.LightningModule):
         print(y_true.shape, y_pred.shape)
         val_loss = nn.BCEWithLogitsLoss()
         ce_loss = val_loss(y_pred, y_true)
-        #accuracy = torch.sum(torch.argmax(y_true, dim=1) == torch.argmax(y_pred, dim=1)) / y_true.shape[0]
+        # accuracy = torch.sum(torch.argmax(y_true, dim=1) == torch.argmax(y_pred, dim=1)) / y_true.shape[0]
 
         log_dict = {'val_loss': ce_loss}
-        #for i in range(self.n_classes):
+        # for i in range(self.n_classes):
         #    preds = torch.argmax(y_pred[torch.argmax(y_true, dim=1) == i], dim=1)
         #    log_dict[f"val_accuracy_class_{i}"] = torch.sum(preds == i) / preds.shape[0]
 
@@ -1060,7 +1062,6 @@ class pl_IS_model(pl.LightningModule):
 
         self.y_true.clear()
         self.y_pred.clear()
-
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -1101,34 +1102,30 @@ class pl_IS_model(pl.LightningModule):
 
 # choosing the config to apply to our model
 segformer_config = SegformerConfig(num_channels=6,
-                num_encoder_blocks=4,
-                depths=[2, 2, 2, 2],
-                sr_ratios=[1, 1, 1, 1],
-                hidden_sizes=[6, 32, 64, 128],
-                patch_sizes=[1, 7, 3, 3],
-                strides=[1, 4, 2, 2],
-                num_attention_heads=[2, 4, 8, 8],
-                mlp_ratios=[4, 4, 4, 4],
-                hidden_act="gelu",
-                hidden_dropout_prob=0.0,
-                attention_probs_dropout_prob=0.0,
-                classifier_dropout_prob=0.0,
-                initializer_range=0.02,
-                drop_path_rate=0.0,
-                layer_norm_eps=1e-6,
-                decoder_hidden_size=128,
-                num_labels=5)
-
-
+                                   num_encoder_blocks=4,
+                                   depths=[2, 2, 2, 2],
+                                   sr_ratios=[1, 1, 1, 1],
+                                   hidden_sizes=[6, 32, 64, 128],
+                                   patch_sizes=[1, 7, 3, 3],
+                                   strides=[1, 4, 2, 2],
+                                   num_attention_heads=[2, 4, 8, 8],
+                                   mlp_ratios=[4, 4, 4, 4],
+                                   hidden_act="gelu",
+                                   hidden_dropout_prob=0.0,
+                                   attention_probs_dropout_prob=0.0,
+                                   classifier_dropout_prob=0.0,
+                                   initializer_range=0.02,
+                                   drop_path_rate=0.0,
+                                   layer_norm_eps=1e-6,
+                                   decoder_hidden_size=128,
+                                   num_labels=5)
 
 # sending our model into pytorch lightning for training and evaluation
 model = pl_IS_model(IsSegformer, segformer_config)
 
-
-
 # create our trainer that will handle training
 logger = CSVLogger(save_dir=output_path, name="logs")
-tb_logger = pl.pytorch.loggers.TensorBoardLogger(save_dir=output_path, name="tb_logs")
+# tb_logger = pl.pytorch.loggers.TensorBoardLogger(save_dir=output_path, name="tb_logs")
 callbacks = [ModelCheckpoint(dirpath=output_path, save_weights_only=True,
                              mode="min", monitor="val_loss",
                              save_last=True),
@@ -1147,13 +1144,12 @@ trainer = pl.Trainer(
     log_every_n_steps=1,
     callbacks=callbacks,
     enable_progress_bar=True,
-    logger=[logger,tb_logger]
+    logger=logger,
+    # logger=[logger, tb_logger]
 )
 
 # fit model
 trainer.fit(model, train_loader, validation_loader)
-
-
 
 # %%
 """=============================================================================
