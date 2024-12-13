@@ -25,8 +25,8 @@ from collections import OrderedDict
 
 # custom modules
 from spep_assets.spep_data import ISDataset
-from spep_assets.spep_figures import pp_size, plot_roc
-from spep_assets.spep_stats import get_bootstrap_metric_ci
+# from spep_assets.spep_figures import pp_size, plot_roc
+# from spep_assets.spep_stats import get_bootstrap_metric_ci
 
 # PYTORCH
 import torch
@@ -57,54 +57,54 @@ assert root_data_path is not None, "Unknown user"
 
 # load x array
 # data is already normalized between 0-1 and zero-padded to a 304 width
-if_x = np.load(r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018\if_v1_x.npy")
+if_x = np.load(os.path.join(root_data_path, "if_v1_x.npy"))
 
 # load y array
-if_y = np.load(r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018\if_v1_y.npy")
+if_y = np.load(os.path.join(root_data_path, "if_v1_y.npy"))
 
 # note: we should create .h5 files to easily load the data using a data manager if we have a lot of samples!
 
 # using a permutation of the subtraction trace to augment the dataset
 # by getting all the combination of subtraction possible from one sample's five tracks
-permutation_aug = True
-if permutation_aug :
-    def faster_permutations(n):
-        # empty() is fast because it does not initialize the values of the array
-        # order='F' uses Fortran ordering, which makes accessing elements in the same column fast
-        perms = np.empty((math.factorial(n), n), dtype=np.uint8, order='F')
-        perms[0, 0] = 0
-
-        rows_to_copy = 1
-        for i in range(1, n):
-            perms[:rows_to_copy, i] = i
-            for j in range(1, i + 1):
-                start_row = rows_to_copy * j
-                end_row = rows_to_copy * (j + 1)
-                splitter = i - j
-                perms[start_row: end_row, splitter] = i
-                perms[start_row: end_row, :splitter] = perms[:rows_to_copy, :splitter]  # left side
-                perms[start_row: end_row, splitter + 1:i + 1] = perms[:rows_to_copy, splitter:i]  # right side
-
-            rows_to_copy *= i + 1
-
-        return perms
-
-    perms = faster_permutations(5) # we will permute all but the first reference track
-    zeros = np.zeros((120,1), dtype=np.uint8)
-    perms0 = np.hstack((zeros, perms+1))
-
-    num_samples = if_x.shape[0]
-    emptyArray_x = np.concatenate([np.zeros((1,304,6)) for i in range(num_samples*119)])
-    emptyArray_y = np.concatenate([np.zeros((1,304,5)) for i in range(num_samples*119)])
-    if_x = np.concatenate([if_x, emptyArray_x])
-    if_y = np.concatenate([if_y, emptyArray_y])
-    counter = num_samples
-    for sample in range(num_samples) :
-        print("permuting traces for patient : ", sample, "/", num_samples)
-        for i in range(1, perms.shape[0]) :  # we don't need to add the first one since it is the original one
-            if_x[counter] = np.expand_dims(np.transpose(if_x[sample, : , perms0[i]]), axis=0)
-            if_y[counter] = np.expand_dims(np.transpose(if_y[0, :, perms[i]]), axis=0)
-            counter+=1
+# permutation_aug = True
+# if permutation_aug :
+#     def faster_permutations(n):
+#         # empty() is fast because it does not initialize the values of the array
+#         # order='F' uses Fortran ordering, which makes accessing elements in the same column fast
+#         perms = np.empty((math.factorial(n), n), dtype=np.uint8, order='F')
+#         perms[0, 0] = 0
+#
+#         rows_to_copy = 1
+#         for i in range(1, n):
+#             perms[:rows_to_copy, i] = i
+#             for j in range(1, i + 1):
+#                 start_row = rows_to_copy * j
+#                 end_row = rows_to_copy * (j + 1)
+#                 splitter = i - j
+#                 perms[start_row: end_row, splitter] = i
+#                 perms[start_row: end_row, :splitter] = perms[:rows_to_copy, :splitter]  # left side
+#                 perms[start_row: end_row, splitter + 1:i + 1] = perms[:rows_to_copy, splitter:i]  # right side
+#
+#             rows_to_copy *= i + 1
+#
+#         return perms
+#
+#     perms = faster_permutations(5) # we will permute all but the first reference track
+#     zeros = np.zeros((120,1), dtype=np.uint8)
+#     perms0 = np.hstack((zeros, perms+1))
+#
+#     num_samples = if_x.shape[0]
+#     emptyArray_x = np.concatenate([np.zeros((1,304,6)) for i in range(num_samples*119)])
+#     emptyArray_y = np.concatenate([np.zeros((1,304,5)) for i in range(num_samples*119)])
+#     if_x = np.concatenate([if_x, emptyArray_x])
+#     if_y = np.concatenate([if_y, emptyArray_y])
+#     counter = num_samples
+#     for sample in range(num_samples) :
+#         print("permuting traces for patient : ", sample, "/", num_samples)
+#         for i in range(1, perms.shape[0]) :  # we don't need to add the first one since it is the original one
+#             if_x[counter] = np.expand_dims(np.transpose(if_x[sample, : , perms0[i]]), axis=0)
+#             if_y[counter] = np.expand_dims(np.transpose(if_y[0, :, perms[i]]), axis=0)
+#             counter += 1
 
 debug_plots = True
 
@@ -157,8 +157,8 @@ if debug_plots:
 
 # seems well stratified
 
-train_dataset = ISDataset(if_x=if_x_train, if_y=if_y_train, smoothing=False, normalize=False, coarse_dropout=False)
-test_dataset = ISDataset(if_x=if_x_test, if_y=if_y_test, smoothing=False, normalize=False, coarse_dropout=False)
+train_dataset = ISDataset(if_x=if_x_train, if_y=if_y_train, smoothing=False, normalize=False, coarse_dropout=False, permute=True)
+test_dataset = ISDataset(if_x=if_x_test, if_y=if_y_test, smoothing=False, normalize=False, coarse_dropout=False, permute=False)
 
 num_workers = 8  # how many processes will load data in parallel; 0 for none
 
@@ -186,6 +186,28 @@ validation_loader = data.DataLoader(
 )
 
 if debug_plots:
+    # test permutations
+    for permut_i in [0, 1, 10, 60, 100]:
+        test_item = train_dataset.__getitem__(permut_i)
+        test_x, test_y = test_item
+        test_x = test_x.reshape((test_x.shape[-1], 1, test_x.shape[0],))
+        n_permuts = len(train_dataset.permutations) if train_dataset.permutations is not None else "none"
+        idx_sample = permut_i // n_permuts if train_dataset.permutations is not None else permut_i
+        permut = train_dataset.permutations[permut_i % n_permuts] if train_dataset.permutations is not None else "none"
+
+        is_tracks = ["ELP", "IgG", "IgA", "IgM", "K", "L"]
+
+        plt.figure(figsize=(12, 12))
+        for j in range(6):
+            plt.subplot(6, 2, j * 2 + 1)
+            sns.lineplot(x=np.arange(304), y=test_x[:, 0, j])  # plot data
+            if j > 0:  # plot annotation map
+                plt.subplot(6, 2, j * 2 + 2)
+                sns.lineplot(x=np.arange(304), y=test_y[:, j - 1])
+        plt.suptitle(f"{idx_sample=} {permut=}")
+        plt.tight_layout()
+        plt.show()
+
     # just to check if the loader works OK
     first_train_batch = next(iter(train_loader))
     x, y = first_train_batch

@@ -9,22 +9,49 @@ import numpy as np
 import torch
 import torch.utils.data as data
 from scipy.ndimage import gaussian_filter
+import itertools
 
 
 class ISDataset(data.Dataset):
-    def __init__(self, if_x: np.array, if_y: np.array, smoothing: bool, normalize: bool, coarse_dropout: bool):
+    def __init__(self, if_x: np.array, if_y: np.array, smoothing: bool, normalize: bool, coarse_dropout: bool, permute: bool):
         self.if_x = if_x
         self.if_y = if_y
         self.smoothing = smoothing
         self.normalize = normalize
+        if permute:
+            # OLD METHOD => permuting everything
+            # n_channels = self.if_x.shape[-1]  # how many channels total (note: the first channel will never be permuted, since it's ELP)
+            # channels_to_permute = np.arange(1, n_channels)  # which channels will be permuted? (not the first)
+            # # precompute permutations
+            # self.permutations = np.array(list(itertools.permutations(channels_to_permute)))
+            # NEW METHOD => permute GAM and KL separately
+            gam_to_permute = [1, 2, 3]
+            kl_to_permute = [4, 5]
+            gam_permutations = np.array(list(itertools.permutations(gam_to_permute)))
+            kl_permutations = np.array(list(itertools.permutations(kl_to_permute)))
+            self.permutations = np.array([np.concatenate([gam, kl]) for gam in gam_permutations for kl in kl_permutations])
+        else:
+            self.permutations = None
         self.coarse_dropout = coarse_dropout
 
     def __len__(self):
+        if self.permutations is not None:
+            return len(self.permutations) * len(self.if_x)
         return len(self.if_x)
 
     def __getitem__(self, idx):
-        x = self.if_x[idx]
-        y = self.if_y[idx]
+        if self.permutations is not None:
+            item_idx = idx // len(self.permutations)  # which sample to select
+            perm_idx = idx % len(self.permutations)  # which permutation to perform
+            x = self.if_x[item_idx]
+            y = self.if_y[item_idx]
+            # permute channels
+            permutation = self.permutations[perm_idx]
+            x = x[:, [0, *permutation]]  # x will be 0 + ... (always ELP then permuted channels)
+            y = y[:, permutation - 1]  # y will be ... (no ELP channel); note: channels have to be subtracted by 1 before since no "first channel" (ELP)
+        else:
+            x = self.if_x[idx]
+            y = self.if_y[idx]
         # smooth
         if self.smoothing:
             x = gaussian_filter(x, sigma=3, axes=-1)  # apply gaussian filter with sigma=3 for smoothing
