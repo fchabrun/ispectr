@@ -47,16 +47,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # dependencies
-    if args.dependencies_path is not None:
-        import sys
-        sys.path.insert(0, args.dependencies_path)
-
-    # custom modules
-    from spep_assets.spep_data import ISDataset
-    from coding_assets.python import config_manager
-    from spep_assets.spep_models import SegformerConfig, IsSegformer, pl_IS_model
-
     """=============================================================================
     Paths and data loading
     ============================================================================="""
@@ -75,10 +65,24 @@ if __name__ == "__main__":
             args.config_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/configs"
             args.data_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/data"
             args.output_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/output"
+            # add some dependency paths
+            args.dependencies_path = ["/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/python",
+                                      "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/coding_assets/python"]
     # check we have a path for everything
     assert (args.config_root_path is not None), f"{args.config_root_path=}"
     assert (args.data_root_path is not None), f"{args.data_root_path=}"
     assert (args.output_root_path is not None), f"{args.output_root_path=}"
+
+    # dependencies
+    if args.dependencies_path is not None:
+        import sys
+        for dep in args.dependencies_path:
+            sys.path.insert(0, dep)
+
+    # custom modules
+    from spep_assets.spep_data import ISDataset
+    from coding_assets.python import config_manager
+    from spep_assets.spep_models import SegformerConfig, IsSegformer, pl_IS_model
 
     # update output_path to include the model name, and create a new folder // same for debug
     args.output_root_path = os.path.join(args.output_root_path, args.model_name)
