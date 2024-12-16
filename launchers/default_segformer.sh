@@ -27,4 +27,4 @@ export PYTHONFAULTHANDLER=1
 srun python /lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/python/SPE_IT_model_training.py \
 --run_mode auto \
 --model_name default_segformer \
---num_workers 16
+--num_workers 4
