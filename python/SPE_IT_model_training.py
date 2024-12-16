@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
     if args.debug is not None:
         # test permutations
-        for permut_i in [0, 1, 10, 60, 100]:
+        for permut_i in [0, 1, 2, 4, 6, 8]:
             test_item = train_dataset.__getitem__(permut_i)
             test_x, test_y = test_item
             test_x = test_x.reshape((test_x.shape[-1], 1, test_x.shape[0],))
