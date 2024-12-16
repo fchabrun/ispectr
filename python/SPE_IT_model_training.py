@@ -257,11 +257,11 @@ if __name__ == "__main__":
         logger = CSVLogger(save_dir=args.output_root_path, name="logs")
         tb_logger = pl.pytorch.loggers.TensorBoardLogger(save_dir=args.output_root_path, name="tb_logs")
         callbacks = [ModelCheckpoint(dirpath=args.output_root_path, save_weights_only=True,
-                                     mode=config.mode, monitor=config.monitor,
+                                     mode=config.callbacks_config["mode"], monitor=config.callbacks_config["monitor"],
                                      save_last=True),
                      EarlyStopping(verbose=args.debug is not None,
-                                   mode=config.callbacks_config.mode, monitor=config.callbacks_config.monitor,
-                                   min_delta=config.callbacks_config.early_stopping_min_delta, patience=config.callbacks_config.early_stopping_patience),
+                                   mode=config.callbacks_config["mode"], monitor=config.callbacks_config["monitor"],
+                                   min_delta=config.callbacks_config["early_stopping_min_delta"], patience=config.callbacks_config["early_stopping_patience"]),
                      ]
 
         trainer = pl.Trainer(
