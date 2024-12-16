@@ -63,7 +63,7 @@ if __name__ == "__main__":
                 args.data_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018"
                 args.output_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\output"
         elif os.path.exists("/lustre/fswork/projects/rech/ild/uqk67mt/ispectr"):  # jean zay
-            args.config_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/configs"
+            args.config_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/configs"  # directly from git
             args.data_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/data"
             args.output_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/output"
             # add some dependency paths
