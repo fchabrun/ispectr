@@ -67,8 +67,9 @@ if __name__ == "__main__":
             args.data_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/data"
             args.output_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/output"
             # add some dependency paths
-            args.dependencies_path = ["/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/python",
-                                      "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/coding_assets/python"]
+            args.dependencies_path = ["/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts",
+                                      "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/python",
+                                      ]
     # check we have a path for everything
     assert (args.config_root_path is not None), f"{args.config_root_path=}"
     assert (args.data_root_path is not None), f"{args.data_root_path=}"
