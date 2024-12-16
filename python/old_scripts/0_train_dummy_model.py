@@ -7,7 +7,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
-from python.spep_assets.spep_dl import SupervisedModule
+from old_assets.spep_dl import SupervisedModule
 from spep_assets.spep_data import ISDataset
 
 import torch

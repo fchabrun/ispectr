@@ -13,23 +13,26 @@ import itertools
 
 
 class ISDataset(data.Dataset):
-    def __init__(self, if_x: np.array, if_y: np.array, smoothing: bool, normalize: bool, coarse_dropout: bool, permute: bool):
+    def __init__(self, if_x: np.array, if_y: np.array, smoothing: bool, normalize: bool, coarse_dropout: bool, permute: str):
         self.if_x = if_x
         self.if_y = if_y
         self.smoothing = smoothing
         self.normalize = normalize
-        if permute:
+        if permute == "full":
             # OLD METHOD => permuting everything
-            # n_channels = self.if_x.shape[-1]  # how many channels total (note: the first channel will never be permuted, since it's ELP)
-            # channels_to_permute = np.arange(1, n_channels)  # which channels will be permuted? (not the first)
-            # # precompute permutations
-            # self.permutations = np.array(list(itertools.permutations(channels_to_permute)))
+            n_channels = self.if_x.shape[-1]  # how many channels total (note: the first channel will never be permuted, since it's ELP)
+            channels_to_permute = np.arange(1, n_channels)  # which channels will be permuted? (not the first)
+            # precompute permutations
+            self.permutations = np.array(list(itertools.permutations(channels_to_permute)))
+        elif permute == "gam_kl":
             # NEW METHOD => permute GAM and KL separately
             gam_to_permute = [1, 2, 3]
             kl_to_permute = [4, 5]
             gam_permutations = np.array(list(itertools.permutations(gam_to_permute)))
             kl_permutations = np.array(list(itertools.permutations(kl_to_permute)))
             self.permutations = np.array([np.concatenate([gam, kl]) for gam in gam_permutations for kl in kl_permutations])
+        elif permute is not None:
+            assert False, f"Unhandled non-None {permute=}"
         else:
             self.permutations = None
         self.coarse_dropout = coarse_dropout
