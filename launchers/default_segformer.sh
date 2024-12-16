@@ -3,7 +3,6 @@
 #SBATCH --job-name=ds1
 #
 #SBATCH --account=ild@v100          # compte GPU
-#SBATCH -C v100-32g                 # utiliser des V100 32g
 #SBATCH --nodes=1                   # nombre de noeuds
 #SBATCH --ntasks=1                  # nombre de processus total
 #SBATCH --ntasks-per-node=1         # nombre de taches MPI par noeud
@@ -13,7 +12,7 @@
 #SBATCH --output=/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/logs/ds1.log
 #SBATCH --error=/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/logs/ds1.err
 #
-#SBATCH --time=20:00:00
+#SBATCH --time=04:00:00             # max heures d'entraînement (max ever = 20)
 
 # clean modules
 module purge

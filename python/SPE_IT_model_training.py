@@ -53,14 +53,15 @@ if __name__ == "__main__":
 
     # default paths, if unspecified
     if (args.config_root_path is None) and (args.data_root_path is None) and (args.output_root_path is None):
-        if "flori" in os.listdir(r"C:\Users"):  # floris
-            args.config_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\ispectr\configs"
-            args.data_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\data\proc\lemans_2018"
-            args.output_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\output"
-        elif "afors" in os.listdir(r"C:\Users"):  # Xavier
-            args.config_root_path = None  # TODO put the directory in which you'll put the config files // it should be in the Github!!! (see current Github)
-            args.data_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018"
-            args.output_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\output"
+        if os.path.exists(r"C:\Users"):
+            if "flori" in os.listdir(r"C:\Users"):  # floris
+                args.config_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\ispectr\configs"
+                args.data_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\data\proc\lemans_2018"
+                args.output_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\output"
+            elif "afors" in os.listdir(r"C:\Users"):  # Xavier
+                args.config_root_path = None  # TODO put the directory in which you'll put the config files // it should be in the Github!!! (see current Github)
+                args.data_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018"
+                args.output_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\output"
         elif os.path.exists("/lustre/fswork/projects/rech/ild/uqk67mt/ispectr"):  # jean zay
             args.config_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/configs"
             args.data_root_path = "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/data"
