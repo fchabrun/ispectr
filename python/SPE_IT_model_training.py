@@ -52,13 +52,16 @@ if __name__ == "__main__":
     ============================================================================="""
 
     # default paths, if unspecified
+    console_verbose = False
     if (args.config_root_path is None) and (args.data_root_path is None) and (args.output_root_path is None):
         if os.path.exists(r"C:\Users"):
             if "flori" in os.listdir(r"C:\Users"):  # floris
+                console_verbose = True
                 args.config_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\ispectr\configs"
                 args.data_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\data\proc\lemans_2018"
                 args.output_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\output"
             elif "afors" in os.listdir(r"C:\Users"):  # Xavier
+                console_verbose = True
                 args.config_root_path = None  # TODO put the directory in which you'll put the config files // it should be in the Github!!! (see current Github)
                 args.data_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\lemans_2018"
                 args.output_root_path = r"C:\Users\afors\Documents\Projects\SPE_IT\output"
@@ -259,7 +262,7 @@ if __name__ == "__main__":
         callbacks = [ModelCheckpoint(dirpath=args.output_root_path, save_weights_only=True,
                                      mode=config.callbacks_config["mode"], monitor=config.callbacks_config["monitor"],
                                      save_last=True),
-                     EarlyStopping(verbose=args.debug is not None,
+                     EarlyStopping(verbose=console_verbose,
                                    mode=config.callbacks_config["mode"], monitor=config.callbacks_config["monitor"],
                                    min_delta=config.callbacks_config["early_stopping_min_delta"], patience=config.callbacks_config["early_stopping_patience"]),
                      ]
@@ -270,7 +273,7 @@ if __name__ == "__main__":
             max_epochs=config.max_epochs,
             log_every_n_steps=1,
             callbacks=callbacks,
-            enable_progress_bar=args.debug is not None,
+            enable_progress_bar=console_verbose,
             logger=[logger, tb_logger]
         )
 
@@ -290,7 +293,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         default_root_dir=args.output_root_path,
         **trainer_args,
-        enable_progress_bar=args.debug is not None,
+        enable_progress_bar=console_verbose,
     )
 
     # predict on validation data
