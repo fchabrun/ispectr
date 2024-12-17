@@ -6,7 +6,7 @@
 #SBATCH --nodes=1                   # nombre de noeuds
 #SBATCH --ntasks-per-node=4         # nombre de taches MPI par noeud
 #SBATCH --gres=gpu:4                # nombre de GPU reserve par noeud
-#SBATCH --cpus-per-task=4           # nombre de coeurs CPU par tache
+#SBATCH --cpus-per-task=2           # nombre de coeurs CPU par tache
 #
 #SBATCH --output=/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/logs/ds1.log
 #SBATCH --error=/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/logs/ds1.err

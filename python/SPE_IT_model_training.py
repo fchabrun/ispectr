@@ -53,6 +53,11 @@ if __name__ == "__main__":
 
     # default paths, if unspecified
     console_verbose = False
+    # default trainer args -> local
+    trainer_args = {'accelerator': 'gpu' if torch.cuda.is_available() else 'cpu',
+                    'devices': 'auto',
+                    'num_nodes': 1,
+                    'strategy': 'auto'}
     if (args.config_root_path is None) and (args.data_root_path is None) and (args.output_root_path is None):
         if os.path.exists(r"C:\Users"):
             if "flori" in os.listdir(r"C:\Users"):  # floris
@@ -73,6 +78,12 @@ if __name__ == "__main__":
             args.dependencies_path = ["/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts",
                                       "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/python",
                                       ]
+            # trainer args custom for slurm
+            # num nodes, etc.
+            trainer_args = {'accelerator': 'gpu',
+                            'devices': int(os.environ['SLURM_GPUS_ON_NODE']),
+                            'num_nodes': int(os.environ['SLURM_NNODES']),
+                            'strategy': 'ddp'}
     # check we have a path for everything
     assert (args.config_root_path is not None), f"{args.config_root_path=}"
     assert (args.data_root_path is not None), f"{args.data_root_path=}"
@@ -242,11 +253,6 @@ if __name__ == "__main__":
     Model training and validation
     ============================================================================="""
 
-    trainer_args = {'accelerator': 'gpu' if torch.cuda.is_available() else 'cpu',
-                    'devices': 'auto',
-                    'num_nodes': 1,
-                    'strategy': 'auto'}
-
     # sending our model into pytorch lightning for training and evaluation
     if args.run_mode == "full":
         if config.architecture == "segformer":
@@ -369,8 +375,11 @@ if __name__ == "__main__":
 
 
     if args.debug is not None:
-        for idx in [0, 100, 200]:
-            plotITPredictions(idx)
+        for idx in [0, 1, 2]:
+            try:
+                plotITPredictions(idx)
+            except:
+                print(f"Unable to plot validation preds for {idx=}")
 
     # Calculons pour chaque pic réel/prédit la concordance
     threshold = 0.5  # ou 0.5

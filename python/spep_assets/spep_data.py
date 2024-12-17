@@ -14,6 +14,7 @@ import itertools
 
 class ISDataset(data.Dataset):
     def __init__(self, if_x: np.array, if_y: np.array, smoothing: bool, normalize: bool, coarse_dropout: bool, permute: str):
+        print(f"Instanciating ISDataset with {if_x.shape=} and  {if_y.shape=}")
         self.if_x = if_x
         self.if_y = if_y
         self.smoothing = smoothing
