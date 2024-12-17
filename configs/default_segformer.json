@@ -44,5 +44,5 @@
 	"coarse_dropout": false,
 	"smoothing": false,
 	"online_normalize": false,
-	"permutation": "full"
+	"permutation": "gam_kl"
 }
