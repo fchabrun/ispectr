@@ -452,6 +452,8 @@ if __name__ == "__main__":
             args.dependencies_path = ["/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts",
                                       "/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/python",
                                       ]
+            print(f"Detected num_nodes is {int(os.environ['SLURM_NNODES'])} (setting to 1)")
+            print(f"Detected devices is {int(os.environ['SLURM_GPUS_ON_NODE'])} (setting to 'auto')")
             # trainer args custom for slurm
             # num nodes, etc.
             # trainer_args = {'accelerator': 'gpu',
@@ -494,5 +496,8 @@ if __name__ == "__main__":
             args.run_mode = "valid"  # do not train because auto & model already exists: only validate model
         else:
             args.run_mode = "full"  # train, then validate (no model exists)
+
+    config_manager.print_config(args, "args")
+    config_manager.print_config(config, "config")
 
     main(args, config)
