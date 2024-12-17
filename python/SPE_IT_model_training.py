@@ -454,10 +454,12 @@ if __name__ == "__main__":
                                       ]
             # trainer args custom for slurm
             # num nodes, etc.
-            trainer_args = {'accelerator': 'gpu',
-                            'devices': int(os.environ['SLURM_GPUS_ON_NODE']),
-                            'num_nodes': int(os.environ['SLURM_NNODES']),
-                            'strategy': 'ddp'}
+            # trainer_args = {'accelerator': 'gpu',
+            #                 'devices': int(os.environ['SLURM_GPUS_ON_NODE']),
+            #                 'num_nodes': int(os.environ['SLURM_NNODES']),
+            #                 'strategy': 'auto'}  # or 'ddp'
+
+    print(f"Set {trainer_args=}")
     # check we have a path for everything
     assert (args.config_root_path is not None), f"{args.config_root_path=}"
     assert (args.data_root_path is not None), f"{args.data_root_path=}"
