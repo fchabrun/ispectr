@@ -4,9 +4,9 @@
 #
 #SBATCH --account=ild@v100          # compte GPU
 #SBATCH --nodes=1                   # nombre de noeuds
-#SBATCH --ntasks-per-node=4         # nombre de taches MPI par noeud
-#SBATCH --gres=gpu:4                # nombre de GPU reserve par noeud
-#SBATCH --cpus-per-task=2           # nombre de coeurs CPU par tache
+#SBATCH --ntasks-per-node=1         # nombre de taches MPI par noeud
+#SBATCH --gres=gpu:1                # nombre de GPU reserve par noeud
+#SBATCH --cpus-per-task=4           # nombre de coeurs CPU par tache
 #
 #SBATCH --output=/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/logs/ds1.log
 #SBATCH --error=/lustre/fswork/projects/rech/ild/uqk67mt/ispectr/logs/ds1.err
@@ -27,4 +27,4 @@ export PYTHONFAULTHANDLER=1
 srun python /lustre/fswork/projects/rech/ild/uqk67mt/ispectr/scripts/ispectr/python/SPE_IT_model_training.py \
 --run_mode full \
 --model_name default_segformer \
---num_workers 2
+--num_workers 4

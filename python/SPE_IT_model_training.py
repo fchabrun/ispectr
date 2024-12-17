@@ -209,7 +209,7 @@ def main(args, config):
     ============================================================================="""
 
     # sending our model into pytorch lightning for training and evaluation
-    if args.run_mode == "full":
+    if args.run_mode in ("full", "train"):
         if config.architecture == "segformer":
             segformer_config = SegformerConfig(**config.architecture_config)
             model_config = config.model_config
