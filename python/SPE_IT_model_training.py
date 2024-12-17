@@ -70,8 +70,6 @@ def main(args, config):
     # load y array
     if_y = np.load(os.path.join(args.data_root_path, "if_v1_y.npy"))
 
-    # note: we should create .h5 files to easily load the data using a data manager if we have a lot of samples!
-
     if args.debug is not None:
         # show the firts sample of the dataset
         is_tracks = ["ELP", "IgG", "IgA", "IgM", "K", "L"]
@@ -103,8 +101,23 @@ def main(args, config):
           'Lambda% : ', round(if_y[..., 4].max(axis=1).sum() / len(if_y[..., 0].max(axis=1)), 2))
 
     # partition
-    if_x_train, if_x_test, if_y_train, if_y_test = train_test_split(if_x, if_y, test_size=.2, random_state=1, shuffle=True,
-                                                                    )
+    # note: we should create .h5 files to easily load the data using a data manager if we have a lot of samples!
+    # if_x_train, if_x_test, if_y_train, if_y_test = train_test_split(if_x, if_y, test_size=.2, random_state=1, shuffle=True)
+    if os.path.exists(os.path.join(args.data_root_path, "train_samples.npy")):  # reload partition lists
+        print("Loading pre-partitioned data")
+        train_samples = np.load(os.path.join(args.data_root_path, "train_samples.npy"))
+    else:  # make partitions
+        print("No pre-partitioned data found, partitioning in situ!")
+        train_samples, _ = train_test_split(np.arange(if_x.shape[0]), test_size=.2, random_state=1, shuffle=True)
+        np.save(os.path.join(args.data_root_path, "train_samples.npy"), train_samples)
+
+    # actually separate datasets
+    if_x_train = if_x[train_samples]
+    if_y_train = if_y[train_samples]
+    test_samples = np.setdiff1d(np.arange(if_x.shape[0]), train_samples)
+    if_x_test = if_x[test_samples]
+    if_y_test = if_y[test_samples]
+
     print('IgG% train : ', round(if_y_train[..., 0].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2), '\n',
           'IgA% train : ', round(if_y_train[..., 1].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2), '\n',
           'IgM% train : ', round(if_y_train[..., 2].max(axis=1).sum() / len(if_y_train[..., 0].max(axis=1)), 2), '\n',
