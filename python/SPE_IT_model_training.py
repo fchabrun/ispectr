@@ -481,4 +481,4 @@ if __name__ == "__main__":
         # note: in pytorch, the output is a list of N elements, N being the number of batches => so we have to convert that to a np array
         validation_preds = torch.cat(validation_outputs).detach().cpu().numpy()
 
-        export_metrics = validation_routine(if_x_test, if_y_test, validation_preds, debug, output_root_path)
+        export_metrics = validation_routine(if_x_test, if_y_test, validation_preds, args.debug, args.output_root_path)
