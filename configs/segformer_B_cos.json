@@ -1,0 +1,48 @@
+{
+	"architecture": "segformer",
+	"architecture_config": {
+		"num_channels": 6,
+		"num_encoder_blocks": 4,
+		"depths": [4, 4, 4, 4],
+		"sr_ratios": [1, 1, 1, 1],
+		"hidden_sizes": [64, 128, 256, 512],
+		"patch_sizes": [1, 7, 3, 3],
+		"strides": [1, 4, 2, 2],
+		"num_attention_heads": [8, 16, 32, 64],
+		"mlp_ratios": [4, 4, 4, 4],
+		"hidden_act": "gelu",
+		"hidden_dropout_prob": 0.0,
+		"attention_probs_dropout_prob": 0.0,
+		"classifier_dropout_prob": 0.0,
+		"initializer_range": 0.02,
+		"drop_path_rate": 0.0,
+		"layer_norm_eps": 1e-6,
+		"decoder_hidden_size": 512,
+		"num_labels": 5
+	},
+	"model_config": {
+		"optimizer": "AdamW",
+		"lr_scheduler": "cosine_with_restarts",
+		"lr": 1e-3,
+		"lr_reduceonplateau_factor": 0.5,
+		"lr_reduceonplateau_patience": 5,
+		"lr_reduceonplateau_threshold": 1e-2,
+		"lr_reduceonplateau_minlr": 1e-6,
+		"num_warmup_steps": 5,
+		"num_training_steps": 15000,
+		"adam_eps": 1e-08,
+		"weight_decay": 0.0
+	},
+	"callbacks_config": {
+		"monitor": "val_loss",
+		"mode": "min",
+		"early_stopping_min_delta": 1e-4,
+		"early_stopping_patience": 15
+	},
+	"max_epochs": 200,
+	"batch_size": 32,
+	"coarse_dropout": false,
+	"smoothing": false,
+	"online_normalize": false,
+	"permutation": "gam_kl"
+}
