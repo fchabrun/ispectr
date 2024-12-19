@@ -262,7 +262,8 @@ def main(args, config):
         # predict on validation data
         validation_outputs = trainer.predict(model, dataloaders=validation_loader)
         # note: in pytorch, the output is a list of N elements, N being the number of batches => so we have to convert that to a np array
-        validation_preds = torch.cat(validation_outputs).detach().cpu().numpy()
+        # new: make sure we are not using logits but probabilities
+        validation_preds = torch.nn.Sigmoid()(torch.cat(validation_outputs)).detach().cpu().numpy()
 
         export_metrics = dict()
 
@@ -302,90 +303,104 @@ def main(args, config):
                     print(f"Unable to plot validation preds for {idx=}")
 
         # Calculons pour chaque pic réel/prédit la concordance
-        threshold = 0.5  # ou 0.5
-        curve_ids = []
-        groundtruth_spikes = []
-        predicted_spikes = []
-        for ix in range(if_x_test.shape[0]):
-            flat_gt = np.zeros_like(if_y_test[ix, :, 0])
-            for i in range(if_y_test.shape[-1]):
-                flat_gt += if_y_test[ix, :, i] * (1 + np.power(2, i))
-            gt_starts = []
-            gt_ends = []
-            prev_v = 0
-            for i in range(304):
-                if flat_gt[i] != prev_v:  # changed
-                    # multiple cases:
-                    # 0 -> non-zero = enter peak
-                    if prev_v == 0:
-                        gt_starts.append(i)
-                    # non-zero -> 0 = out of peak
-                    elif flat_gt[i] == 0:
-                        gt_ends.append(i)
-                    # non-zero -> different non-zero = enter other peak
-                    else:
-                        gt_ends.append(i)
-                        gt_starts.append(i)
-                    prev_v = flat_gt[i]
+        def get_curve_ids_gt_spikes_pred_spikes(include_false_positives: bool):
+            threshold = 0.5  # ou 0.5
+            curve_ids = []
+            groundtruth_spikes = []
+            predicted_spikes = []
+            for ix in range(if_x_test.shape[0]):
+                flat_gt = np.zeros_like(if_y_test[ix, :, 0])
+                for i in range(if_y_test.shape[-1]):
+                    flat_gt += if_y_test[ix, :, i] * (1 + np.power(2, i))
+                gt_starts = []
+                gt_ends = []
+                prev_v = 0
+                for i in range(304):
+                    if flat_gt[i] != prev_v:  # changed
+                        # multiple cases:
+                        # 0 -> non-zero = enter peak
+                        if prev_v == 0:
+                            gt_starts.append(i)
+                        # non-zero -> 0 = out of peak
+                        elif flat_gt[i] == 0:
+                            gt_ends.append(i)
+                        # non-zero -> different non-zero = enter other peak
+                        else:
+                            gt_ends.append(i)
+                            gt_starts.append(i)
+                        prev_v = flat_gt[i]
 
-            if len(gt_starts) != len(gt_ends):
-                raise Exception('Inconsistent start/end points')
+                if len(gt_starts) != len(gt_ends):
+                    raise Exception('Inconsistent start/end points')
 
-            if len(gt_starts) > 0:
-                # TODO => ce type de validation ne prend pas en compte les faux positifs!
-                # pour chaque pic, on détecte ce que le modèle a rendu a cet endroit comme type d'Ig
-                for pstart, pend in zip(gt_starts, gt_ends):
-                    gt_ig_denom = ''
-                    if np.sum(if_y_test[ix, pstart:pend, :3]) > 0:
-                        HC_gt = int(np.median(np.argmax(if_y_test[ix, pstart:pend, :3], axis=1)))
-                        gt_ig_denom = ['G', 'A', 'M'][HC_gt]
-                    lC_gt = int(np.median(np.argmax(if_y_test[ix, pstart:pend, 3:], axis=1)))
-                    gt_ig_denom += ['k', 'l'][lC_gt]
+                if len(gt_starts) > 0:
+                    # TODO => ce type de validation ne prend pas en compte les faux positifs!
+                    # pour chaque pic, on détecte ce que le modèle a rendu a cet endroit comme type d'Ig
+                    for pstart, pend in zip(gt_starts, gt_ends):
+                        gt_ig_denom = ''
+                        if np.sum(if_y_test[ix, pstart:pend, :3]) > 0:
+                            HC_gt = int(np.median(np.argmax(if_y_test[ix, pstart:pend, :3], axis=1)))
+                            gt_ig_denom = ['G', 'A', 'M'][HC_gt]
+                        lC_gt = int(np.median(np.argmax(if_y_test[ix, pstart:pend, 3:], axis=1)))
+                        gt_ig_denom += ['k', 'l'][lC_gt]
 
+                        pred_ig_denom = ''
+                        if np.sum(validation_preds[ix, :, pstart:pend] > threshold) > 0:  # un pic a été détecté
+                            if np.sum(validation_preds[ix, :3, pstart:pend] > threshold) > 0:
+                                HC_pred = int(np.median(np.argmax(validation_preds[ix, :3, pstart:pend], axis=0)))
+                                pred_ig_denom = ['G', 'A', 'M'][HC_pred]
+                            lC_pred = int(np.median(np.argmax(validation_preds[ix, 3:, pstart:pend], axis=0)))
+                            pred_ig_denom += ['k', 'l'][lC_pred]
+                        else:
+                            pred_ig_denom = 'none'
+
+                        groundtruth_spikes.append(gt_ig_denom)
+                        predicted_spikes.append(pred_ig_denom)
+                        curve_ids.append(ix)
+                elif include_false_positives:
+                    gt_ig_denom = 'none'
                     pred_ig_denom = ''
-                    if np.sum(validation_preds[ix, :, pstart:pend] > threshold) > 0:  # un pic a été détecté
-                        if np.sum(validation_preds[ix, :3, pstart:pend] > threshold) > 0:
-                            HC_pred = int(np.median(np.argmax(validation_preds[ix, :3, pstart:pend], axis=0)))
-                            pred_ig_denom = ['G', 'A', 'M'][HC_pred]
-                        lC_pred = int(np.median(np.argmax(validation_preds[ix, 3:, pstart:pend], axis=0)))
-                        pred_ig_denom += ['k', 'l'][lC_pred]
-                    else:
-                        pred_ig_denom = 'none'
+                    if np.sum(validation_preds[ix, :3, :] > threshold) > 0:
+                        HC_pred = int(np.median(np.argmax(validation_preds[ix, :3, :], axis=0)))
+                        pred_ig_denom = ['G', 'A', 'M'][HC_pred]
+                    lC_pred = int(np.median(np.argmax(validation_preds[ix, 3:, :], axis=0)))
+                    pred_ig_denom += ['k', 'l'][lC_pred]
 
                     groundtruth_spikes.append(gt_ig_denom)
                     predicted_spikes.append(pred_ig_denom)
                     curve_ids.append(ix)
-            else:
-                gt_ig_denom = 'none'
-                pred_ig_denom = ''
-                if np.sum(validation_preds[ix, :3, :] > threshold) > 0:
-                    HC_pred = int(np.median(np.argmax(validation_preds[ix, :3, :], axis=0)))
-                    pred_ig_denom = ['G', 'A', 'M'][HC_pred]
-                lC_pred = int(np.median(np.argmax(validation_preds[ix, 3:, :], axis=0)))
-                pred_ig_denom += ['k', 'l'][lC_pred]
 
-                groundtruth_spikes.append(gt_ig_denom)
-                predicted_spikes.append(pred_ig_denom)
-                curve_ids.append(ix)
+            return curve_ids, groundtruth_spikes, predicted_spikes
 
-        conc_df = pd.DataFrame(dict(ix=curve_ids,
-                                    true=groundtruth_spikes,
-                                    pred=predicted_spikes))
+        def compute_precision_by_peak(export_metrics, include_false_positives: bool):
+            curve_ids, groundtruth_spikes, predicted_spikes = get_curve_ids_gt_spikes_pred_spikes(include_false_positives=include_false_positives)
+            metric_suffix = "FP" if include_false_positives else "noFP"
 
-        print(pd.crosstab(conc_df.true, conc_df.pred))
+            conc_df = pd.DataFrame(dict(ix=curve_ids,
+                                        true=groundtruth_spikes,
+                                        pred=predicted_spikes))
 
-        print('Global precision: ' + str(round(100 * np.sum(conc_df.true == conc_df.pred) / conc_df.shape[0], 1)))
-        for typ in np.unique(conc_df.true):
-            subset = conc_df.true == typ
-            print('  Precision for type ' + typ + ': ' + str(
-                round(100 * np.sum(conc_df.true.loc[subset] == conc_df.pred.loc[subset]) / np.sum(subset), 1)))
-            export_metrics['Acc-{}'.format(typ)] = 100 * np.sum(conc_df.true.loc[subset] == conc_df.pred.loc[subset]) / np.sum(
-                subset)
-        export_metrics['Acc-global'] = 100 * np.sum(conc_df.true == conc_df.pred) / conc_df.shape[0]
+            print(f"With {include_false_positives=}")
 
-        export_metrics['Mistakes-total'] = conc_df.loc[conc_df.true != conc_df.pred, :].shape[0]
-        mistakes = conc_df.loc[conc_df.true != conc_df.pred, 'ix'].unique().tolist()
-        export_metrics['Mistakes-curves'] = len(mistakes)
+            print(pd.crosstab(conc_df.true, conc_df.pred))
+
+            print('Global precision: ' + str(round(100 * np.sum(conc_df.true == conc_df.pred) / conc_df.shape[0], 1)))
+            for typ in np.unique(conc_df.true):
+                subset = conc_df.true == typ
+                print('  Precision for type ' + typ + ': ' + str(
+                    round(100 * np.sum(conc_df.true.loc[subset] == conc_df.pred.loc[subset]) / np.sum(subset), 1)))
+                export_metrics[f'Acc-{typ}-{metric_suffix}'] = 100 * np.sum(conc_df.true.loc[subset] == conc_df.pred.loc[subset]) / np.sum(
+                    subset)
+            export_metrics[f'Acc-global-{metric_suffix}'] = 100 * np.sum(conc_df.true == conc_df.pred) / conc_df.shape[0]
+
+            export_metrics[f'Mistakes-total-{metric_suffix}'] = conc_df.loc[conc_df.true != conc_df.pred, :].shape[0]
+            mistakes = conc_df.loc[conc_df.true != conc_df.pred, 'ix'].unique().tolist()
+            export_metrics[f'Mistakes-curves-{metric_suffix}'] = len(mistakes)
+
+            return export_metrics
+
+        export_metrics = compute_precision_by_peak(export_metrics, include_false_positives=False)
+        export_metrics = compute_precision_by_peak(export_metrics, include_false_positives=True)
 
         # export predictions
         np.save(os.path.join(args.output_root_path, "validation_preds.npy"), validation_preds)
@@ -406,7 +421,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode")  # dummy arg => for PyCharm only
     parser.add_argument("--run_mode", type=str, default="auto")  # run_mode=auto will set to training+validation if no ckpt is found, else validation
     parser.add_argument("--model_name", type=str,
-                        default="default_segformer")  # name of the model, will be used to 1) load the right config file and 2) export to a custom new folder
+                        default="segformer_B")  # name of the model, will be used to 1) load the right config file and 2) export to a custom new folder
     parser.add_argument("--data_root_path", type=str,
                         default=None)  # path in which look for the config file // if None, will try to see if local (Floris' or Xavier's PC)
     parser.add_argument("--config_root_path", type=str,
