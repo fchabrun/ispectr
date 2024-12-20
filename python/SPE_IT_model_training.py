@@ -254,6 +254,8 @@ def main(args, config):
         # reload last = best (hopefully?) checkpoint
         if config.architecture == "segformer":
             model = pl_IS_model.load_from_checkpoint(os.path.join(args.output_root_path, "last.ckpt"))
+        elif config.architecture == "swinunet":
+            model = pl_IS_model.load_from_checkpoint(os.path.join(args.output_root_path, "last.ckpt"))
         else:
             assert False, f"Unhandled {config.architecture=}"
 
