@@ -214,6 +214,10 @@ def main(args, config):
             segformer_config = SegformerConfig(**config.architecture_config)
             model_config = config.model_config
             model = pl_IS_model(IsSegformer, segformer_config, **model_config)
+        elif config.architecture == "swinunet":
+            swinunet_config = SwinUnetConfig(**config.architecture_config)
+            model_config = config.model_config
+            model = pl_IS_model(SwinTransformerForIS, swinunet_config, **model_config)
         else:
             assert False, f"Unhandled {config.architecture=}"
 
@@ -491,7 +495,7 @@ if __name__ == "__main__":
     # custom modules
     from spep_assets.spep_data import ISDataset
     from coding_assets.python import config_manager
-    from spep_assets.spep_models import SegformerConfig, IsSegformer, pl_IS_model
+    from spep_assets.spep_models import SegformerConfig, IsSegformer, SwinUnetConfig, SwinTransformerForIS, pl_IS_model
 
     # update output_path to include the model name, and create a new folder // same for debug
     args.output_root_path = os.path.join(args.output_root_path, args.model_name)
