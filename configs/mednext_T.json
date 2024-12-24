@@ -1,0 +1,42 @@
+{
+	"architecture": "mednext",
+	"architecture_config": {
+			"in_channels" : 6,
+            "n_channels" :  64,
+            "n_classes" : 5,
+            "exp_r" : 4,
+            "kernel_size" : 7,
+            "deep_supervision" : false,
+            "do_res" : true,
+            "do_res_up_down" : true,
+            "block_counts" : [2, 2, 2, 2, 2, 2, 2, 2, 2],
+            "norm_type":"group",
+            "grn":false,
+            "neg_slope":1e-2
+	},
+	"model_config": {
+		"optimizer": "AdamW",
+		"lr_scheduler": "cosine_with_restarts",
+		"lr": 5e-4,
+		"lr_reduceonplateau_factor": 0.5,
+		"lr_reduceonplateau_patience": 5,
+		"lr_reduceonplateau_threshold": 1e-2,
+		"lr_reduceonplateau_minlr": 1e-6,
+		"num_warmup_steps": 5000,
+		"num_training_steps": 50000,
+		"adam_eps": 1e-08,
+		"weight_decay": 0.0
+	},
+	"callbacks_config": {
+		"monitor": "val_loss",
+		"mode": "min",
+		"early_stopping_min_delta": 1e-4,
+		"early_stopping_patience": 100
+	},
+	"max_epochs": 150,
+	"batch_size": 32,
+	"coarse_dropout": false,
+	"smoothing": false,
+	"online_normalize": false,
+	"permutation": "gam_kl"
+}

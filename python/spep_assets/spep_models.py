@@ -1615,6 +1615,602 @@ class SwinTransformerForIS(nn.Module):
         )
 
 
+
+"""
+========================================================================================================================
+################# MedNeXt model adapted for 1d data
+"""
+
+
+class MedNeXtConfig:
+    r"""
+    This is the configuration class to store the configuration of a [`MedNeXtModel`]. It is used to instantiate an
+    MedNext model according to the specified arguments, defining the model architecture.
+
+    Args:
+
+    ```"""
+
+    model_type = "mednext"
+
+    def __init__(
+            self,
+            in_channels: int,
+            n_channels: int,
+            n_classes: int,
+            exp_r: int = 4,  # Expansion ratio as in Swin Transformers
+            kernel_size: int = 7,  # Ofcourse can test kernel_size
+            enc_kernel_size: int = None,
+            dec_kernel_size: int = None,
+            deep_supervision: bool = False,  # Can be used to test deep supervision
+            do_res: bool = False,  # Can be used to individually test residual connection
+            do_res_up_down: bool = False,  # Additional 'res' connection on up and down convs
+            block_counts = [2, 2, 2, 2, 2, 2, 2, 2, 2],  # Can be used to test staging ratio:
+            # [3,3,9,3] in Swin as opposed to [2,2,2,2,2] in nnUNet
+            norm_type='group',
+            grn=False,
+            neg_slope=1e-2
+    ):
+        super().__init__()
+
+        self.in_channels = in_channels
+        self.n_channels = n_channels
+        self.in_channels = in_channels
+        self.n_classes = n_classes
+        self.exp_r = exp_r
+        self.kernel_size = kernel_size
+        self.enc_kernel_size = enc_kernel_size
+        self.dec_kernel_size = dec_kernel_size
+        self.deep_supervision = deep_supervision
+        self.do_res = do_res
+        self.do_res_up_down = do_res_up_down
+        self.block_counts = block_counts
+        self.norm_type = norm_type
+        self.grn = grn
+        self.neg_slope = neg_slope
+
+
+
+class MedNeXtBlock(nn.Module):
+
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 exp_r: int = 4,
+                 kernel_size: int = 7,
+                 do_res: int = True,
+                 norm_type: str = 'group',
+                 n_groups: int or None = None,
+                 grn=False
+                 ):
+
+        super().__init__()
+
+        self.do_res = do_res
+
+        # First Conv1D layer with DepthWise Convolutions
+        self.conv1 = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=in_channels,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=kernel_size // 2,
+            groups=in_channels if n_groups is None else n_groups,
+        )
+
+        # Normalization Layer. GroupNorm is used by default.
+        if norm_type == 'group':
+            self.norm = nn.GroupNorm(
+                num_groups=in_channels,
+                num_channels=in_channels
+            )
+        elif norm_type == 'layer':
+            self.norm = MedNeXtLayerNorm(
+                normalized_shape=in_channels,
+                data_format='channels_first'
+            )
+
+        # Second convolution (Expansion) layer with Conv1D
+        self.conv2 = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=exp_r * in_channels,
+            kernel_size=1,
+            stride=1,
+            padding=0
+        )
+
+        # GeLU activations
+        self.act = nn.GELU()
+
+        # Third convolution (Compression) layer
+        self.conv3 = nn.Conv1d(
+            in_channels=exp_r * in_channels,
+            out_channels=out_channels,
+            kernel_size=1,
+            stride=1,
+            padding=0
+        )
+
+        #self.grn = grn
+        #if grn:
+        #    if dim == '3d':
+        #        self.grn_beta = nn.Parameter(torch.zeros(1, exp_r * in_channels, 1, 1, 1), requires_grad=True)
+        #        self.grn_gamma = nn.Parameter(torch.zeros(1, exp_r * in_channels, 1, 1, 1), requires_grad=True)
+        #    elif dim == '2d':
+        #        self.grn_beta = nn.Parameter(torch.zeros(1, exp_r * in_channels, 1, 1), requires_grad=True)
+        #        self.grn_gamma = nn.Parameter(torch.zeros(1, exp_r * in_channels, 1, 1), requires_grad=True)
+
+    def forward(self, x, dummy_tensor=None):
+
+        x1 = x
+        x1 = self.conv1(x1)
+        x1 = self.act(self.conv2(self.norm(x1)))
+        #if self.grn:
+            # gamma, beta: learnable affine transform parameters
+            # X: input of shape (N,C,H,W,D)
+        #    if self.dim == '3d':
+        #        gx = torch.norm(x1, p=2, dim=(-3, -2, -1), keepdim=True)
+        #    elif self.dim == '2d':
+        #        gx = torch.norm(x1, p=2, dim=(-2, -1), keepdim=True)
+        #    nx = gx / (gx.mean(dim=1, keepdim=True) + 1e-6)
+        #    x1 = self.grn_gamma * (x1 * nx) + self.grn_beta + x1
+        x1 = self.conv3(x1)
+        if self.do_res:
+            x1 = x + x1
+        return x1
+
+
+class MedNeXtDownBlock(MedNeXtBlock):
+
+    def __init__(self, in_channels, out_channels, exp_r=4, kernel_size=7,
+                 do_res=False, norm_type='group', grn=False):
+
+        super().__init__(in_channels, out_channels, exp_r, kernel_size,
+                         do_res=False, norm_type=norm_type,
+                         grn=grn)
+
+        self.resample_do_res = do_res
+        if do_res:
+            self.res_conv = nn.Conv1d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                stride=2
+            )
+
+        self.conv1 = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=in_channels,
+            kernel_size=kernel_size,
+            stride=2,
+            padding=kernel_size // 2,
+            groups=in_channels,
+        )
+
+    def forward(self, x, dummy_tensor=None):
+
+        x1 = super().forward(x)
+
+        if self.resample_do_res:
+            res = self.res_conv(x)
+            x1 = x1 + res
+
+        return x1
+
+
+class MedNeXtUpBlock(MedNeXtBlock):
+
+    def __init__(self, in_channels, out_channels, exp_r=4, kernel_size=7,
+                 do_res=False, norm_type='group', grn=False):
+        super().__init__(in_channels, out_channels, exp_r, kernel_size,
+                         do_res=False, norm_type=norm_type,
+                         grn=grn)
+
+        self.resample_do_res = do_res
+
+        if do_res:
+            self.res_conv = nn.ConvTranspose1d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                stride=2
+            )
+
+        self.conv1 = nn.ConvTranspose1d(
+            in_channels=in_channels,
+            out_channels=in_channels,
+            kernel_size=kernel_size,
+            stride=2,
+            padding=kernel_size // 2,
+            groups=in_channels,
+        )
+
+    def forward(self, x, dummy_tensor=None):
+
+        x1 = super().forward(x)
+        # Asymmetry but necessary to match shape
+
+        x1 = nn.functional.pad(x1, (1, 0))
+
+        if self.resample_do_res:
+            res = self.res_conv(x)
+            res = nn.functional.pad(res, (1, 0))
+            x1 = x1 + res
+
+        return x1
+
+
+class MedNeXtOutBlock(nn.Module):
+
+    def __init__(self, in_channels, n_classes):
+        super().__init__()
+
+        self.conv_out = nn.Conv1d(in_channels, n_classes, kernel_size=1)
+
+    def forward(self, x, dummy_tensor=None):
+        return self.conv_out(x)
+
+
+class MedNeXtLayerNorm(nn.Module):
+    """ LayerNorm that supports two data formats: channels_last (default) or channels_first.
+    The ordering of the dimensions in the inputs. channels_last corresponds to inputs with
+    shape (batch_size, height, width, channels) while channels_first corresponds to inputs
+    with shape (batch_size, channels, height, width).
+    """
+
+    def __init__(self, normalized_shape, eps=1e-5, data_format="channels_last"):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(normalized_shape))  # beta
+        self.bias = nn.Parameter(torch.zeros(normalized_shape))  # gamma
+        self.eps = eps
+        self.data_format = data_format
+        if self.data_format not in ["channels_last", "channels_first"]:
+            raise NotImplementedError
+        self.normalized_shape = (normalized_shape,)
+
+    def forward(self, x, dummy_tensor=False):
+        if self.data_format == "channels_last":
+            return nn.functional.layer_norm(x, self.normalized_shape, self.weight, self.bias, self.eps)
+        elif self.data_format == "channels_first":
+            u = x.mean(1, keepdim=True)
+            s = (x - u).pow(2).mean(1, keepdim=True)
+            x = (x - u) / torch.sqrt(s + self.eps)
+            x = self.weight[:, None, None, None] * x + self.bias[:, None, None, None]
+            return x
+
+
+class MedNeXtForIS(nn.Module):
+
+    def __init__(self,
+                 config,
+                 ):
+
+        super().__init__()
+
+        self.config = config
+        self.do_ds = config.deep_supervision
+
+        if config.kernel_size is not None:
+            enc_kernel_size = config.kernel_size
+            dec_kernel_size = config.kernel_size
+        else :
+            enc_kernel_size = config.enc_kernel_size
+            dec_kernel_size = config.dec_kernel_size
+
+        self.stem = nn.Conv1d(config.in_channels, config.n_channels, kernel_size=1) # padding='same'
+
+        if type(config.exp_r) == int:
+            exp_r = [config.exp_r for _ in range(len(config.block_counts))]
+
+        self.enc_block_0 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels,
+                out_channels=config.n_channels,
+                exp_r=exp_r[0],
+                kernel_size=enc_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[0])]
+                                         )
+
+        self.down_0 = MedNeXtDownBlock(
+            in_channels=config.n_channels,
+            out_channels=2 * config.n_channels,
+            exp_r=exp_r[1],
+            kernel_size=enc_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+        )
+
+        self.enc_block_1 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels * 2,
+                out_channels=config.n_channels * 2,
+                exp_r=exp_r[1],
+                kernel_size=enc_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[1])]
+                                         )
+
+        self.down_1 = MedNeXtDownBlock(
+            in_channels=2 * config.n_channels,
+            out_channels=4 * config.n_channels,
+            exp_r=exp_r[2],
+            kernel_size=enc_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+            grn=config.grn
+        )
+
+        self.enc_block_2 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels * 4,
+                out_channels=config.n_channels * 4,
+                exp_r=exp_r[2],
+                kernel_size=enc_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[2])]
+                                         )
+
+        self.down_2 = MedNeXtDownBlock(
+            in_channels=4 * config.n_channels,
+            out_channels=8 * config.n_channels,
+            exp_r=exp_r[3],
+            kernel_size=enc_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+            grn=config.grn
+        )
+
+        self.enc_block_3 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels * 8,
+                out_channels=config.n_channels * 8,
+                exp_r=exp_r[3],
+                kernel_size=enc_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[3])]
+                                         )
+
+        self.down_3 = MedNeXtDownBlock(
+            in_channels=8 * config.n_channels,
+            out_channels=16 * config.n_channels,
+            exp_r=exp_r[4],
+            kernel_size=enc_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+            grn=config.grn
+        )
+
+        self.bottleneck = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels * 16,
+                out_channels=config.n_channels * 16,
+                exp_r=exp_r[4],
+                kernel_size=dec_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[4])]
+                                        )
+
+        self.up_3 = MedNeXtUpBlock(
+            in_channels=16 * config.n_channels,
+            out_channels=8 * config.n_channels,
+            exp_r=exp_r[5],
+            kernel_size=dec_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+            grn=config.grn
+        )
+
+        self.dec_block_3 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels * 8,
+                out_channels=config.n_channels * 8,
+                exp_r=exp_r[5],
+                kernel_size=dec_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[5])]
+                                         )
+
+        self.up_2 = MedNeXtUpBlock(
+            in_channels=8 * config.n_channels,
+            out_channels=4 * config.n_channels,
+            exp_r=exp_r[6],
+            kernel_size=dec_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+            grn=config.grn
+        )
+
+        self.dec_block_2 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels * 4,
+                out_channels=config.n_channels * 4,
+                exp_r=exp_r[6],
+                kernel_size=dec_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[6])]
+                                         )
+
+        self.up_1 = MedNeXtUpBlock(
+            in_channels=4 * config.n_channels,
+            out_channels=2 * config.n_channels,
+            exp_r=exp_r[7],
+            kernel_size=dec_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+            grn=config.grn
+        )
+
+        self.dec_block_1 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels * 2,
+                out_channels=config.n_channels * 2,
+                exp_r=exp_r[7],
+                kernel_size=dec_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for i in range(config.block_counts[7])]
+                                         )
+
+        self.up_0 = MedNeXtUpBlock(
+            in_channels=2 * config.n_channels,
+            out_channels=config.n_channels,
+            exp_r=exp_r[8],
+            kernel_size=dec_kernel_size,
+            do_res=config.do_res_up_down,
+            norm_type=config.norm_type,
+            grn=config.grn
+        )
+
+        self.dec_block_0 = nn.Sequential(*[
+            MedNeXtBlock(
+                in_channels=config.n_channels,
+                out_channels=config.n_channels,
+                exp_r=exp_r[8],
+                kernel_size=dec_kernel_size,
+                do_res=config.do_res,
+                norm_type=config.norm_type,
+                grn=config.grn
+            )
+            for _ in range(config.block_counts[8])]
+                                         )
+
+        self.out_0 = MedNeXtOutBlock(in_channels=config.n_channels, n_classes=config.n_classes)
+
+        if config.deep_supervision:
+            self.out_1 = MedNeXtOutBlock(in_channels=config.n_channels * 2, n_classes=config.n_classes)
+            self.out_2 = MedNeXtOutBlock(in_channels=config.n_channels * 4, n_classes=config.n_classes)
+            self.out_3 = MedNeXtOutBlock(in_channels=config.n_channels * 8, n_classes=config.n_classes)
+            self.out_4 = MedNeXtOutBlock(in_channels=config.n_channels * 16, n_classes=config.n_classes)
+
+        self.block_counts = config.block_counts
+
+        self.neg_slope = config.neg_slope
+
+        self.apply(self._init_weights)
+
+
+#    def _init_weights(self, m):
+#        if isinstance(m, nn.Conv1d) or isinstance(m, nn.ConvTranspose1d) :
+#            m.weight = nn.init.kaiming_normal_(m.weight, a=self.neg_slope)
+#            if m.bias is not None:
+#                m.bias = nn.init.constant_(m.bias, 0)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Conv1d) or isinstance(m, nn.ConvTranspose1d) :
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+
+    def forward(self, x: torch.FloatTensor,
+        labels: Optional[torch.LongTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+
+        ) -> Union[Tuple, SemanticSegmenterOutput]:
+
+        r"""
+        labels (`torch.LongTensor` of shape `(batch_size, height, width)`, *optional*):
+            Ground truth semantic segmentation maps for computing the loss. Indices should be in `[0, ...,
+            config.num_labels - 1]`. If `config.num_labels > 1`, a classification loss is computed (Cross-Entropy).
+
+        Returns:
+
+        ```"""
+
+        x = x.squeeze(2)
+        x = self.stem(x)
+
+        x_res_0 = self.enc_block_0(x)
+        x = self.down_0(x_res_0)
+        x_res_1 = self.enc_block_1(x)
+        x = self.down_1(x_res_1)
+        x_res_2 = self.enc_block_2(x)
+        x = self.down_2(x_res_2)
+        x_res_3 = self.enc_block_3(x)
+        x = self.down_3(x_res_3)
+
+        x = self.bottleneck(x)
+        if self.do_ds:
+            x_ds_4 = self.out_4(x)
+
+        x_up_3 = self.up_3(x)
+        dec_x = x_res_3 + x_up_3
+        x = self.dec_block_3(dec_x)
+
+        if self.do_ds:
+            x_ds_3 = self.out_3(x)
+        del x_res_3, x_up_3
+
+        x_up_2 = self.up_2(x)
+        dec_x = x_res_2 + x_up_2
+        x = self.dec_block_2(dec_x)
+        if self.do_ds:
+            x_ds_2 = self.out_2(x)
+        del x_res_2, x_up_2
+
+        x_up_1 = self.up_1(x)
+        dec_x = x_res_1 + x_up_1
+        x = self.dec_block_1(dec_x)
+        if self.do_ds:
+            x_ds_1 = self.out_1(x)
+        del x_res_1, x_up_1
+
+        x_up_0 = self.up_0(x)
+        dec_x = x_res_0 + x_up_0
+        x = self.dec_block_0(dec_x)
+        del x_res_0, x_up_0, dec_x
+
+        x = self.out_0(x)
+
+        if self.do_ds:
+            logits = [x, x_ds_1, x_ds_2, x_ds_3, x_ds_4]
+        else:
+            logits =  x
+
+        loss = None
+        if labels is not None:
+            if self.config.n_classes > 1:
+                loss_fct = nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels.transpose(1, 2))
+
+        return SemanticSegmenterOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=None,  # not implemented yet
+            attentions=None,  # not implemented yet
+        )
+
+
+
 """
 ========================================================================================================================
 ################# Generic pytorch Lightning class to wrap and train models with
