@@ -218,6 +218,10 @@ def main(args, config):
             swinunet_config = SwinUnetConfig(**config.architecture_config)
             model_config = config.model_config
             model = pl_IS_model(SwinTransformerForIS, swinunet_config, **model_config)
+        elif config.architecture == "mednext":
+            mednext_config = MedNeXtConfig(**config.architecture_config)
+            model_config = config.model_config
+            model = pl_IS_model(MedNeXtForIS, mednext_config, **model_config)
         else:
             assert False, f"Unhandled {config.architecture=}"
 
@@ -255,6 +259,8 @@ def main(args, config):
         if config.architecture == "segformer":
             model = pl_IS_model.load_from_checkpoint(os.path.join(args.output_root_path, "last.ckpt"))
         elif config.architecture == "swinunet":
+            model = pl_IS_model.load_from_checkpoint(os.path.join(args.output_root_path, "last.ckpt"))
+        elif config.architecture == "mednext":
             model = pl_IS_model.load_from_checkpoint(os.path.join(args.output_root_path, "last.ckpt"))
         else:
             assert False, f"Unhandled {config.architecture=}"
