@@ -433,7 +433,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode")  # dummy arg => for PyCharm only
     parser.add_argument("--run_mode", type=str, default="auto")  # run_mode=auto will set to training+validation if no ckpt is found, else validation
     parser.add_argument("--model_name", type=str,
-                        default="segformer_B")  # name of the model, will be used to 1) load the right config file and 2) export to a custom new folder
+                        default="mednext_T")  # name of the model, will be used to 1) load the right config file and 2) export to a custom new folder
     parser.add_argument("--data_root_path", type=str,
                         default=None)  # path in which look for the config file // if None, will try to see if local (Floris' or Xavier's PC)
     parser.add_argument("--config_root_path", type=str,
@@ -503,7 +503,7 @@ if __name__ == "__main__":
     # custom modules
     from spep_assets.spep_data import ISDataset
     from coding_assets.python import config_manager
-    from spep_assets.spep_models import SegformerConfig, IsSegformer, SwinUnetConfig, SwinTransformerForIS, pl_IS_model
+    from spep_assets.spep_models import SegformerConfig, IsSegformer, SwinUnetConfig, SwinTransformerForIS, MedNeXtConfig, MedNeXtForIS, pl_IS_model
 
     # update output_path to include the model name, and create a new folder // same for debug
     args.output_root_path = os.path.join(args.output_root_path, args.model_name)

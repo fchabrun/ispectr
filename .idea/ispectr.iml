@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/python/old_assets" />
       <excludeFolder url="file://$MODULE_DIR$/python/old_scripts" />
     </content>
-    <orderEntry type="jdk" jdkName="Python311_PyTorch_11_2024" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="py311_torch21gpu_dec23" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
