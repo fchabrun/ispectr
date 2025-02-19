@@ -1507,7 +1507,7 @@ class SwinTransformerForIS(nn.Module):
         self.norm_up = config.norm_layer(self.embed_dim)
 
         if self.final_upsample == "expand_first":
-            print("---final upsample expand_first---")
+            #print("---final upsample expand_first---")
             self.up = FinalPatchExpand_X4(dim_scale=4, dim=config.embed_dim)
             self.output = nn.Conv1d(in_channels=config.embed_dim, out_channels=self.num_classes, kernel_size=1, bias=False)
 
@@ -1533,7 +1533,7 @@ class SwinTransformerForIS(nn.Module):
     # Encoder and Bottleneck
     def forward_features(self, x):
         x = self.patch_embed(x)
-        print("embed shape : ",x.shape)
+        #print("embed shape : ",x.shape)
         if self.ape:
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
