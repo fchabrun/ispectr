@@ -113,3 +113,7 @@ plot_IT_predictions(1, x_test[1, ...], sa_preds[1,...], debug='inline')
 plot_IT_predictions(2, x_test[2, ...], sa_preds[2,...], debug='inline')
 plot_IT_predictions(3, x_test[3, ...], sa_preds[3,...], debug='inline')
 plot_IT_predictions(4, x_test[4, ...], sa_preds[4,...], debug='inline')
+
+np.save(r"C:\Users\afors\Documents\Projects\SPE_IT\output\sa_preds.npy", sa_preds)
+np.save(r"C:\Users\afors\Documents\Projects\SPE_IT\output\sa_x.npy", x_test)
+
