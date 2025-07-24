@@ -1,0 +1,1 @@
+pg_restore --data-only -f "C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\extraction tutorial\extract.dump" -t anagrafica "C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\extraction tutorial\Total_11_05_2024.backup"
