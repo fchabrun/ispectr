@@ -9,39 +9,39 @@ json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\R
 
 app = Dash()
 
-sideBar={
-    "toolPanels": [
-        {
-            "id": "columns",
-            "labelDefault": "Columns",
-            "labelKey": "columns",
-            "iconKey": "columns",
-            "toolPanel": "agColumnsToolPanel",
-        },
-        {
-            "id": "filters",
-            "labelDefault": "Filters",
-            "labelKey": "filters",
-            "iconKey": "filter",
-            "toolPanel": "agFiltersToolPanel",
-        },
-        {
-            "id": "filters 2",
-            "labelKey": "filters",
-            "labelDefault": "More Filters",
-            "iconKey": "menu",
-            "toolPanel": "agFiltersToolPanel",
-        },
-    ],
-    "position": "left",
-    "defaultToolPanel": "filters",
+SIDEBAR_STYLE = {
+    "position": "fixed",
+    "top": 0,
+    "left": 0,
+    "bottom": 0,
+    "width": "16rem",
+    "padding": "2rem 1rem",
+    "background-color": "#f8f9fa",
 }
 
-app.layout = [
-    html.H1(children='iSPECTR annotation tool'),
-    dcc.Dropdown(os.listdir(os.path.join(json_rootdirectory, "input_jsons")), '', id='json-dropdown-selection'),
-    dcc.Graph(id='elp-graph-content')
-]
+CONTENT_STYLE = {
+    "margin-left": "18rem",
+    "margin-right": "2rem",
+    "padding": "2rem 1rem",
+}
+
+sidebar = html.Div(
+    [
+        html.H2("iSPECTR annotation tool", className="display-4"),
+        html.Hr(),
+        dcc.Dropdown(os.listdir(os.path.join(json_rootdirectory, "input_jsons")), '', id='json-dropdown-selection'),
+    ],
+    style=SIDEBAR_STYLE,
+)
+
+content = html.Div([html.H1(children='iSPECTR annotation tool'),
+                    dcc.Graph(id='elp-graph-content')
+                    ],
+                   id="page-content",
+                   style=CONTENT_STYLE)
+
+app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
+
 
 @callback(
     Output('elp-graph-content', 'figure'),
