@@ -231,6 +231,8 @@ for (iter_i in 1:length(unique_aaids)) {
                              age = age,
                              sex = sex,
                              total_protein = tp,
+                             short_comments = short_comments,
+                             long_comments = long_comments,
                              traces=list(ELP = list(exists=T, data=elp_trace),
                                          IgG = list(exists=T, data=g_trace),
                                          IgA = list(exists=T, data=a_trace),

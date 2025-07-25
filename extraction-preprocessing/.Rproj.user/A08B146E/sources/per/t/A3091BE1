@@ -1,0 +1,26 @@
+{
+    "id": "A3091BE1",
+    "path": "~/Home/Research/SPECTR/ISPECTR/ispectr/extraction-preprocessing/1_load_lemans_data_for_annotation_2025.r",
+    "project_path": "1_load_lemans_data_for_annotation_2025.r",
+    "type": "r_source",
+    "hash": "2772380581",
+    "contents": "",
+    "dirty": false,
+    "created": 1753442721520.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "229,56",
+        "scrollLine": "204"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1753442623,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1753442623,
+    "read_only": false,
+    "read_only_alternatives": []
+}
