@@ -1,25 +1,39 @@
 from dash import Dash, html, dcc, callback, Output, Input, State, dash_table, ctx
-import dash_bootstrap_components as dbc
+# import dash_bootstrap_components as dbc
 import plotly.express as px
 import pandas as pd
 import os
 import json
 import numpy as np
+import shutil
 
 json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation"
-json_filenames = os.listdir(os.path.join(json_rootdirectory, "input_jsons"))
-# default_json_filename = json_filenames[0]
-json_list_dropdown_data = []
-for json_filename in json_filenames:
-    previous_data_exists = os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename))
-    if previous_data_exists:
-        json_color = 'Gold'
-    else:
-        json_color = 'Black'
-    new_json_entry = {'label': html.Span([json_filename], style={'color': json_color}),
-                      'value': json_filename,
-                      'search': json_filename}
-    json_list_dropdown_data.append(new_json_entry)
+
+
+def json_file_lists_to_dropdown_options(full_json_list, mode):
+    json_list_dropdown_data = []
+    for json_info in full_json_list:
+        if mode == "annotate":
+            json_color = 'Gold' if json_info["previous"] else 'Black'
+        elif mode == "review":
+            json_color = 'Red' if json_info["exclude"] else 'Orange' if json_info["doubtful"] else 'Green'
+        elif mode == "confirm":
+            json_color = 'Red' if json_info["exclude"] else 'Orange' if json_info["doubtful"] else 'Green'
+        else:
+            assert False, f"Unknown {mode=}"
+        new_json_entry = {'label': html.Span([json_info["json_filename"]], style={'color': json_color}),
+                          'value': json_info["json_filename"],
+                          'search': json_info["json_filename"]}
+        json_list_dropdown_data.append(new_json_entry)
+    return json_list_dropdown_data
+
+
+# pre load the list of json files
+# list all json files (annotated and unannotated)
+full_json_list = []
+existingpreviousdata_json_filenames = os.listdir(os.path.join(json_rootdirectory, "previous_2020_output_jsons"))
+for json_filename in os.listdir(os.path.join(json_rootdirectory, "input_jsons")):
+    full_json_list.append({"json_filename": json_filename, "previous": (json_filename in existingpreviousdata_json_filenames)})
 
 app = Dash(prevent_initial_callbacks=True)
 
@@ -43,7 +57,21 @@ sidebar = html.Div(
     [
         html.H3("iSPECTR annotation tool", className="display-4"),
         html.Hr(),
-        dcc.Dropdown(json_list_dropdown_data, "", id='json-dropdown-selection'),
+        dcc.RadioItems(
+            options={
+                'annotate': 'Annotate',
+                'confirm': 'Confirm',
+                'review': 'Review'
+            },
+            value='annotate',
+            id="mode-radio"
+        ),
+        html.Br(),
+        html.Div(id='n-json-files-found'),
+        dcc.Dropdown([], "", id='json-dropdown-selection'),
+        html.Br(),
+        html.Button('SAVE AND VALIDATE', id='save-output-button', n_clicks=0),
+        html.Hr(),
         html.Button('Populate from SPECTR', id='spectr-to-peaks-button', n_clicks=0),
         html.Button('Populate from PREVIOUS (2020)', id='previous-2020-to-peaks-button', n_clicks=0),
         html.Br(),
@@ -99,6 +127,9 @@ sidebar = html.Div(
         ),
         html.Br(),
         html.Button('Add peak', id='add-peak-button', n_clicks=0),
+        html.Br(),
+        html.Br(),
+        dcc.Checklist(['Doubtful', 'Exclude', ], [], id="comments-checkbox"),
         html.Hr(),
         html.P(id="old-lemans-text"),
         html.P("Local institution comments", style={"font-weight": "bold"}),
@@ -110,6 +141,10 @@ sidebar = html.Div(
 
 graphs_layout = html.Div(
     [
+        dcc.ConfirmDialog(
+            id='cant-save-dialog',
+            message='Unable to save annotations: incomplete or invalid peak data',
+        ),
         html.Div(
             [
                 html.P("ELP", style={"display": "block", "text-align": "left", "margin": "0.5rem", "font-weight": "bold"}),
@@ -143,9 +178,9 @@ content = html.Div([graphs_layout,
 app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
 
 
-def get_trace_plot(trace_data, spectr_preds=None, trace_peak_data=None):
+def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_data=None):
     trace_data = np.array(trace_data)
-    color_discrete_map = {"Relative intensity": 'black'}
+    color_discrete_map = {"Relative intensity": 'red' if exclude else 'orange' if doubtful else 'black'}
     if spectr_preds is not None:
         plot_df = pd.DataFrame({"Relative time": np.arange(len(trace_data)) + 1,
                                 "Relative intensity": trace_data,
@@ -157,7 +192,7 @@ def get_trace_plot(trace_data, spectr_preds=None, trace_peak_data=None):
                                 "Relative intensity": trace_data})
         y_cols = ["Relative intensity", ]
 
-    if trace_peak_data is not None:  # add peaks
+    if (trace_peak_data is not None) and (not exclude):  # add peaks
         # create map from peak
         for i in range(len(trace_peak_data)):
             start = trace_peak_data.start.iloc[i]
@@ -205,8 +240,125 @@ def get_trace_plot(trace_data, spectr_preds=None, trace_peak_data=None):
     return fig
 
 
+def comments_to_spans(comments, keyword="(IgG|IgA|IgM|kappa|Kappa|lambda|Lambda)"):
+    import re
+
+    spans = []
+    for com_txt in comments:
+        new_span = [html.Span(txt, style={"color": ("red" if i % 2 == 1 else "black")}) for i, txt in enumerate(re.split(keyword, com_txt))]
+        spans.append(new_span)
+    return spans
+
+
+@callback(
+    Output('cant-save-dialog', 'displayed'),
+    Output('n-json-files-found', 'children'),
+    Output('json-dropdown-selection', 'options'),
+    Output('json-dropdown-selection', 'value'),
+    Output('save-output-button', 'children'),
+    Input('save-output-button', 'n_clicks'),
+    Input('mode-radio', 'value'),
+    State('output-peaks-data-table', 'data'),
+    State('json-dropdown-selection', 'options'),
+    State('json-dropdown-selection', 'value'),
+    State('comments-checkbox', 'value'),
+    State('save-output-button', 'children'),
+    State('n-json-files-found', 'children')
+)
+def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, json_filename, comments_checkbox, prev_save_button_txt, prev_n_json_txt):
+    # if save => save
+    if n_clicks > 0:
+        if ctx.triggered_id == "save-output-button":
+            # reject if annotations are not OK
+            for row in rows:
+                invalid = False
+                if (int(row["start"]) <= 150) or (int(row["end"]) <= 150) or (int(row["start"]) >= 300) or (int(row["end"]) >= 300):
+                    invalid = True
+                if int(row["start"]) >= int(row["end"]):
+                    invalid = True
+                if (row["hc"] not in ["IgG", "IgA", "IgM", ""]) or (row["lc"] not in ["K", "L", ""]):
+                    invalid = True
+                if (row["hc"] == "") and (row["lc"] == ""):
+                    invalid = True
+                if invalid:
+                    return True, prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt
+
+            if mode == "annotate":
+                # reload json input file and add new annotations to it
+                with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
+                    json_content = json.load(f)
+                # create json content
+                json_content["peak_data"] = rows
+                json_content["doubtful"] = "Doubtful" in comments_checkbox
+                json_content["exclude"] = "Exclude" in comments_checkbox
+                # save new json
+                with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
+                    json.dump(json_content, f)
+            elif mode == "confirm":  # copy in validated folder
+                shutil.copy(os.path.join(json_rootdirectory, "output_jsons", json_filename),
+                            os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
+            elif mode == "review":  # discard
+                os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
+                os.remove(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
+
+    # according to review mode or not, determine the list of json files to show and the default (first) to choose
+    if mode == "annotate":
+        # load list of json that were already annotated
+        annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+        # filter them out from the full list
+        tmp_json_list = [e for e in full_json_list if e["json_filename"] not in annotated_json_filenames]
+        # color
+        json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
+        # send back
+        if len(json_options) > 10:
+            n_json_files_found_txt = f"{len(json_options)} unannotated files found, displaying first 10"
+            json_options = json_options[:10]
+            return False, n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT'
+        n_json_files_found_txt = f"{len(json_options)} unannotated files found"
+        return False, n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT'
+    elif mode == "confirm":
+        # load list of json that were already annotated
+        annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+        confirmed_json_filenames = os.listdir(os.path.join(json_rootdirectory, "confirmed_jsons"))
+        # filter them out from the full list
+        tmp_json_list = [e for e in full_json_list if (e["json_filename"] in annotated_json_filenames) and (e["json_filename"] not in confirmed_json_filenames)]
+        # annotate exclude/doubtful
+        for json_info in tmp_json_list:
+            with open(os.path.join(json_rootdirectory, "output_jsons", json_info["json_filename"]), "r") as f:
+                saved_output_data = json.load(f)
+            json_info["doubtful"] = saved_output_data["doubtful"]
+            json_info["exclude"] = saved_output_data["exclude"]
+        # color
+        json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
+        # send back
+        if len(json_options) > 100:
+            n_json_files_found_txt = f"{len(json_options)} annotated files found, displaying first 100"
+            json_options = json_options[:100]
+            return False, n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT'
+        n_json_files_found_txt = f"{len(json_options)} annotated files found"
+        return False, n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT'
+    elif mode == "review":
+        # load list of json that were already annotated
+        annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+        confirmed_json_filenames = os.listdir(os.path.join(json_rootdirectory, "confirmed_jsons"))
+        # filter them out from the full list
+        tmp_json_list = [e for e in full_json_list if (e["json_filename"] in annotated_json_filenames) and (e["json_filename"] in confirmed_json_filenames)]
+        # annotate exclude/doubtful
+        for json_info in tmp_json_list:
+            with open(os.path.join(json_rootdirectory, "output_jsons", json_info["json_filename"]), "r") as f:
+                saved_output_data = json.load(f)
+            json_info["doubtful"] = saved_output_data["doubtful"]
+            json_info["exclude"] = saved_output_data["exclude"]
+        # color
+        json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
+        # send back
+        n_json_files_found_txt = f"{len(json_options)} confirmed files found"
+        return False, n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'DISCARD OUTPUT'
+
+
 @callback(
     Output('output-peaks-data-table', 'data', allow_duplicate=True),
+    Output('comments-checkbox', 'value'),
     Output('elp-graph-content-left', 'figure'),
     Output('elp-graph-content-right', 'figure'),
     Output('g-graph-content', 'figure'),
@@ -221,18 +373,35 @@ def get_trace_plot(trace_data, spectr_preds=None, trace_peak_data=None):
     Output('old-lemans-text', 'children'),
     Input('json-dropdown-selection', 'value'),
     Input('output-peaks-data-table', 'data'),
-    State('output-peaks-data-table', 'data'),
+    Input('comments-checkbox', 'value'),
+    State('mode-radio', 'value'),
     prevent_initial_call=True
 )
-def update_graph(json_filename, peak_data, rows):
+def update_graph(json_filename, rows, comments_checkbox, mode):
     if json_filename == '':
-        return None
+        return ([], [],
+                None, None, None, None, None, None, None,
+                None, None, None)
 
+    saved_output_data = None
     if ctx.triggered_id == "json-dropdown-selection":  # we changed the json file => reset peaks
-        rows = []
+        comments_checkbox = []  # reset comments
+        if mode in ('confirm', 'review'):
+            # load previous output
+            load_dir = "output_jsons" if (mode == "confirm") else "confirmed_jsons"
+            with open(os.path.join(json_rootdirectory, load_dir, json_filename), "r") as f:
+                saved_output_data = json.load(f)
+            rows = saved_output_data["peak_data"]
+            if saved_output_data["doubtful"]:
+                comments_checkbox.append("Doubtful")
+            if saved_output_data["exclude"]:
+                comments_checkbox.append("Exclude")
+        else:
+            # not in review mode: just reset current peaks
+            rows = []
 
-    if len(peak_data) > 0:
-        peak_data = pd.DataFrame(peak_data)
+    if len(rows) > 0:
+        peak_data = pd.DataFrame(rows)
         peak_data.start = pd.to_numeric(peak_data.start)
         peak_data.end = pd.to_numeric(peak_data.end)
         peak_data = peak_data[peak_data.lc.isin(["K", "L"]) | peak_data.hc.isin(["IgG", "IgA", "IgM"])]
@@ -242,29 +411,43 @@ def update_graph(json_filename, peak_data, rows):
         peak_data = None
 
     # load input data
-    with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
-        sample_data = json.load(f)
+    if mode == "annotate":
+        # load input data without any annotations
+        with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
+            sample_data = json.load(f)
+    elif mode in ('confirm', 'review'):
+        if saved_output_data is not None:
+            sample_data = saved_output_data
+        else:
+            # load annotated output file
+            load_dir = "output_jsons" if (mode == "confirm") else "confirmed_jsons"
+            with open(os.path.join(json_rootdirectory, load_dir, json_filename), "r") as f:
+                sample_data = json.load(f)
+    else:
+        assert False, f"Unknown {mode=}"
 
     short_comments = sample_data["short_comments"]
     long_comments = sample_data["long_comments"]
 
-    short_comments = [html.P(txt, style={"padding": "0", "margin": "1rem 0"}) for txt in short_comments.split("\\n") if len(txt) > 0]
-    long_comments = [html.P(txt, style={"padding": "0", "margin": "1rem 0"}) for txt in long_comments.split("\\n") if len(txt) > 0]
+    # separate comments by lines
+    short_comments = [txt for txt in short_comments.split("\\n") if len(txt) > 0]
+    long_comments = [txt for txt in long_comments.split("\\n") if len(txt) > 0]
+
+    # look for keywords
+    short_spans = comments_to_spans(short_comments)
+    long_spans = comments_to_spans(long_comments)
+
+    # format as paragraphs
+    short_comments = [html.P(span, style={"padding": "0", "margin": "0.5rem 0"}) for span in short_spans]
+    long_comments = [html.P(span, style={"padding": "0", "margin": "0.5rem 0"}) for span in long_spans]
 
     # load spectr data
     with open(os.path.join(json_rootdirectory, "spectr_jsons", json_filename), "r") as f:
         sample_spectr_data = json.load(f)
     spectr_elp_preds = np.array(sample_spectr_data["elp_spep_s_predictions"])
 
-    # TODO should have TWO MODES:
-    # 1) annotate -> do NOT load output files, just input files + pre-annotations (SPECTR) + Le Mans OLD. EVEN IF OUTPUT EXISTS. Enable user to save output annotation. DOES NOT BY DEFAULT DISPLAY SAMPLES FOR WHICH AN ANNOTATION EXISTS.
-    # 2) review -> do NOT suggest m-spike location, just look at existing (saved) OUTPUT annotations. Look only at samples for which an OUTPUT file EXISTS. Should enable user to overwrite existing annotation OR remove it (so we can start from scratch)
-
-    # TODO save
-
-    # TODO reload existing output
-
-    # TODO in comments, automatically detect words like "IgG", "kappa", etc and put them in BOLD RED
+    doubtful = "Doubtful" in comments_checkbox
+    exclude = "Exclude" in comments_checkbox
 
     traces = []
     for trace_name in ("ELP", "ELP", "IgG", "IgA", "IgM", "K", "L"):
@@ -273,7 +456,11 @@ def update_graph(json_filename, peak_data, rows):
             trace_peak_data["ontrace"] = (trace_peak_data.lc == trace_name) | (trace_peak_data.hc == trace_name)
         else:
             trace_peak_data = None
-        new_trace = get_trace_plot(sample_data["traces"][trace_name]["data"], spectr_preds=spectr_elp_preds if trace_name == "ELP" else None, trace_peak_data=trace_peak_data)
+        new_trace = get_trace_plot(trace_data=sample_data["traces"][trace_name]["data"],
+                                   doubtful=doubtful,
+                                   exclude=exclude,
+                                   spectr_preds=spectr_elp_preds if trace_name == "ELP" else None,
+                                   trace_peak_data=trace_peak_data)
         traces.append(new_trace)
 
     if os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename)):
@@ -281,11 +468,11 @@ def update_graph(json_filename, peak_data, rows):
             previous_sample_data = json.load(f)
 
         old_lemans_class_ = previous_sample_data["groundtruth_class"]
-        old_lemans_text = f"Previous (2020) data exists: {old_lemans_class_}"
+        old_lemans_text = html.Span(f"Previous (2020) data exists: {old_lemans_class_}", style={"color": "red"})
     else:
         old_lemans_text = None
 
-    return rows, *traces, short_comments, long_comments, old_lemans_text
+    return rows, comments_checkbox, *traces, short_comments, long_comments, old_lemans_text
 
 
 @callback(
