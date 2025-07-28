@@ -7,27 +7,7 @@ import json
 import numpy as np
 # import shutil
 
-# OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
-
 json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation"
-
-
-# if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
-#     for json_filename in os.listdir(os.path.join(json_rootdirectory, "output_jsons")):
-#         # load input json
-#         with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
-#             input_json_content = json.load(f)
-#         # load output (annotated) json
-#         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), "r") as f:
-#             output_json_content = json.load(f)
-#         # add annotations to input json
-#         input_json_content["peak_data"] = output_json_content["peak_data"]
-#         input_json_content["doubtful"] = output_json_content["doubtful"]
-#         input_json_content["exclude"] = output_json_content["exclude"]
-#         input_json_content["annotated_by"] = output_json_content["annotated_by"]
-#         # overwrite previous output (annotated) json
-#         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
-#             json.dump(input_json_content, f, indent=4)
 
 
 def json_file_lists_to_dropdown_options(full_json_list, mode):
@@ -188,8 +168,6 @@ graphs_layout = html.Div(
         ),
         html.Div(
             [
-                html.P("SPEP", style={"display": "block", "text-align": "left", "margin": "0.5rem", "font-weight": "bold"}),
-                dcc.Graph(id='spe-graph-content', style={"display": "block", "height": "20vh"}),
                 html.P("ELP", style={"display": "block", "text-align": "left", "margin": "0.5rem", "font-weight": "bold"}),
                 dcc.Graph(id='elp-graph-content-left', style={"display": "block", "height": "20vh"}),
                 html.P("Kappa", style={"display": "block", "text-align": "left", "margin": "0.5rem", "font-weight": "bold"}),
@@ -209,7 +187,7 @@ content = html.Div([graphs_layout,
 app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
 
 
-def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_data=None, peak_color="red", peak_alt_color="#cccccc"):
+def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_data=None):
     trace_data = np.array(trace_data)
     color_discrete_map = {"Relative intensity": 'red' if exclude else 'orange' if doubtful else 'black'}
     if spectr_preds is not None:
@@ -241,9 +219,9 @@ def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_
             plot_df[f"Peak {i+1}"] = peak_map
             y_cols.append(f"Peak {i+1}")
             if ontrace:
-                color_discrete_map[f"Peak {i+1}"] = peak_color
+                color_discrete_map[f"Peak {i+1}"] = "red"
             else:
-                color_discrete_map[f"Peak {i+1}"] = peak_alt_color
+                color_discrete_map[f"Peak {i+1}"] = "#cccccc"
 
     fig = px.line(plot_df, x="Relative time", y=y_cols, color_discrete_map=color_discrete_map)
     fig.update_xaxes(title='', visible=True, showticklabels=True,
@@ -333,7 +311,7 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
                 json_content["annotated_by"] = reviewer_id
                 # save new json
                 with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
-                    json.dump(json_content, f, indent=4)
+                    json.dump(json_content, f)
             elif mode == "confirm":  # copy in validated folder
                 # shutil.copy(os.path.join(json_rootdirectory, "output_jsons", json_filename),
                 #             os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
@@ -345,7 +323,7 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
                 json_content["confirmed_by"] = reviewer_id
                 # save new json
                 with open(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename), 'w') as f:
-                    json.dump(json_content, f, indent=4)
+                    json.dump(json_content, f)
             elif mode == "review":  # discard
                 os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
                 os.remove(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
@@ -418,7 +396,7 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
     Output('k-graph-content', 'figure'),
     Output('l-graph-content', 'figure'),
     # Output('ref-graph-content', 'figure'),
-    Output('spe-graph-content', 'figure'),
+    # Output('spe-graph-content', 'figure'),
     Output('short-comments-text', 'children'),
     Output('long-comments-text', 'children'),
     Output('old-lemans-text', 'children'),
@@ -435,8 +413,7 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
         return ([], [],
                 dict(display='none'),
                 reviewer_id,
-                {}, {}, {}, {}, {}, {}, {}, {},
-                # None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None,
                 None, None, None)
 
     saved_output_data = None
@@ -509,35 +486,18 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
     exclude = "Exclude" in comments_checkbox
 
     traces = []
-    for trace_name in ("ELP", "ELP", "IgG", "IgA", "IgM", "K", "L", "SPE"):
-        if sample_data["traces"][trace_name]["exists"]:
-            peak_color = "red"
-            peak_alt_color = "#cccccc"
-            if trace_name == "SPE":
-                trace_peak_data = None
-                if (sample_data["traces"][trace_name]["peaks"] is not None) and (len(sample_data["traces"][trace_name]["peaks"]) > 0) and (len(sample_data["traces"][trace_name]["peaks"]) % 2 == 0):
-                    p_start = sample_data["traces"][trace_name]["peaks"][::2]
-                    p_end = sample_data["traces"][trace_name]["peaks"][1::2]
-                    trace_peak_data = pd.DataFrame({"start": p_start,"end": p_end, "ontrace": [True, ] * len(p_start)})
-                peak_color = "purple"
-                peak_alt_color = "purple"
-            elif (trace_name not in ["ELP", "Ref"]) and (peak_data is not None):
-                trace_peak_data = peak_data.copy()
-                trace_peak_data["ontrace"] = (trace_peak_data.lc == trace_name) | (trace_peak_data.hc == trace_name)
-            else:
-                trace_peak_data = None
-            new_trace = get_trace_plot(trace_data=sample_data["traces"][trace_name]["data"],
-                                       doubtful=doubtful,
-                                       exclude=exclude,
-                                       spectr_preds=spectr_elp_preds if trace_name == "ELP" else None,
-                                       trace_peak_data=trace_peak_data,
-                                       peak_color=peak_color,
-                                       peak_alt_color=peak_alt_color)
+    for trace_name in ("ELP", "ELP", "IgG", "IgA", "IgM", "K", "L"):
+        if (trace_name != "ELP") and (peak_data is not None):
+            trace_peak_data = peak_data.copy()
+            trace_peak_data["ontrace"] = (trace_peak_data.lc == trace_name) | (trace_peak_data.hc == trace_name)
         else:
-            new_trace = {}
+            trace_peak_data = None
+        new_trace = get_trace_plot(trace_data=sample_data["traces"][trace_name]["data"],
+                                   doubtful=doubtful,
+                                   exclude=exclude,
+                                   spectr_preds=spectr_elp_preds if trace_name == "ELP" else None,
+                                   trace_peak_data=trace_peak_data)
         traces.append(new_trace)
-
-    # TODO show SPEP with manually annotated peaks
 
     if os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename)):
         with open(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename), "r") as f:
