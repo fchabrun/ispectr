@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import json
 import numpy as np
+from datetime import datetime
 # import shutil
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
@@ -157,6 +158,9 @@ sidebar = html.Div(
         dcc.Checklist(['Doubtful', 'Exclude', ], [], id="comments-checkbox"),
         html.Div([
             html.Button('SAVE', id='save-output-button', n_clicks=0, style={"font-weight": "bold"}),
+            html.Br(),
+            html.Br(),
+            html.Button('DISCARD', id='discard-output-button', n_clicks=0, style={}),
         ], style={"text-align": "center"}),
         html.Br(),
         html.Hr(),
@@ -291,36 +295,42 @@ def comments_to_spans(comments, keyword="(IgG|IgA|IgM|kappa|Kappa|lambda|Lambda)
     Output('json-dropdown-selection', 'options'),
     Output('json-dropdown-selection', 'value'),
     Output('save-output-button', 'children'),
+    Output('discard-output-button', 'children'),
+    Output('save-output-button', 'style'),
+    Output('discard-output-button', 'style'),
     Input('save-output-button', 'n_clicks'),
+    Input('discard-output-button', 'n_clicks'),
     Input('mode-radio', 'value'),
     State('output-peaks-data-table', 'data'),
     State('json-dropdown-selection', 'options'),
     State('json-dropdown-selection', 'value'),
     State('comments-checkbox', 'value'),
     State('save-output-button', 'children'),
+    State('discard-output-button', 'children'),
+    State('save-output-button', 'style'),
+    State('discard-output-button', 'style'),
     State('n-json-files-found', 'children'),
     State('input-reviewer', 'value')
 )
-def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, json_filename, comments_checkbox, prev_save_button_txt, prev_n_json_txt, reviewer_id):
+def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows, prev_json_options, json_filename, comments_checkbox, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style, prev_n_json_txt, reviewer_id):
     # if save => save
-    if n_clicks > 0:
+    if (n_clicks_save > 0) or (n_clicks_discard > 0):
         if ctx.triggered_id == "save-output-button":
             # reject if annotations are not OK
             if (reviewer_id is None) or (reviewer_id == ""):
                 error_dialog_msg = "Please enter a reviewer name"
-                return True, error_dialog_msg, prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt
+                return True, error_dialog_msg, prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
             for row in rows:
-                invalid = False
                 if (int(row["start"]) <= 150) or (int(row["end"]) <= 150) or (int(row["start"]) >= 300) or (int(row["end"]) >= 300):
-                    return True, "Unable to save annotations: invalid peak position", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt
+                    return True, "Unable to save annotations: invalid peak position", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
                 if int(row["start"]) >= int(row["end"]):
-                    return True, "Unable to save annotations: invalid peak size", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt
+                    return True, "Unable to save annotations: invalid peak size", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
                 if row["hc"] not in ["IgG", "IgA", "IgM", ""]:
-                    return True, "Unable to save annotations: invalid peak HC", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt
+                    return True, "Unable to save annotations: invalid peak HC", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
                 if row["lc"] not in ["K", "L", ""]:
-                    return True, "Unable to save annotations: invalid peak LC", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt
+                    return True, "Unable to save annotations: invalid peak LC", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
                 if (row["hc"] == "") and (row["lc"] == ""):
-                    return True, "Unable to save annotations: HC and LC cannot be both missing", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt
+                    return True, "Unable to save annotations: HC and LC cannot be both missing", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
 
             if mode == "annotate":
                 # reload json input file and add new annotations to it
@@ -331,6 +341,7 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
                 json_content["doubtful"] = "Doubtful" in comments_checkbox
                 json_content["exclude"] = "Exclude" in comments_checkbox
                 json_content["annotated_by"] = reviewer_id
+                json_content["annotated_at"] = f"{datetime.now()}"
                 # save new json
                 with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
                     json.dump(json_content, f, indent=4)
@@ -343,9 +354,14 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
                     json_content = json.load(f)
                 # add reviewer name
                 json_content["confirmed_by"] = reviewer_id
+                json_content["confirmed_at"] = f"{datetime.now()}"
                 # save new json
                 with open(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename), 'w') as f:
                     json.dump(json_content, f, indent=4)
+
+        if ctx.triggered_id == "discard-output-button":
+            if mode == "confirm":  # discard
+                os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
             elif mode == "review":  # discard
                 os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
                 os.remove(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
@@ -362,9 +378,9 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
         if len(json_options) > 10:
             n_json_files_found_txt = f"{len(json_options)} unannotated files found, displaying first 10"
             json_options = json_options[:10]
-            return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT'
+            return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT', "", {"font-weight": "bold"}, {"display": 'none'}
         n_json_files_found_txt = f"{len(json_options)} unannotated files found"
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT'
+        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT', "", {"font-weight": "bold"}, {"display": 'none'}
     elif mode == "confirm":
         # load list of json that were already annotated
         annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
@@ -380,12 +396,12 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
         # color
         json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
         # send back
-        if len(json_options) > 100:
-            n_json_files_found_txt = f"{len(json_options)} annotated files found, displaying first 100"
-            json_options = json_options[:100]
-            return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT'
+        # if len(json_options) > 100:
+        #     n_json_files_found_txt = f"{len(json_options)} annotated files found, displaying first 100"
+        #     json_options = json_options[:100]
+        #     return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT", {"font-weight": "bold"}, {}
         n_json_files_found_txt = f"{len(json_options)} annotated files found"
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT'
+        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT", {"font-weight": "bold"}, {}
     elif mode == "review":
         # load list of json that were already annotated
         annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
@@ -402,7 +418,7 @@ def save_and_update_json_files_list(n_clicks, mode, rows, prev_json_options, jso
         json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
         # send back
         n_json_files_found_txt = f"{len(json_options)} confirmed files found"
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'DISCARD OUTPUT'
+        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", '', "DISCARD SAVED OUTPUT", {"display": 'none', "font-weight": "bold"}, {}
 
 
 @callback(
@@ -536,8 +552,6 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
         else:
             new_trace = {}
         traces.append(new_trace)
-
-    # TODO show SPEP with manually annotated peaks
 
     if os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename)):
         with open(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename), "r") as f:
