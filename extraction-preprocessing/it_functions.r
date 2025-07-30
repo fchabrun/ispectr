@@ -69,7 +69,7 @@ decipherCurve_v2024_2 <- function(data_line, threshold_error = 4000, threshold_l
       last_real_point = min(setdiff(1:length(s), delimitations))
       replacement_value = s[last_real_point]
     } else {
-      # TODO 3rd case: if delim is in the middle (take into account if another delim right after/before!)
+      # 3rd case: if delim is in the middle (take into account if another delim right after/before!)
       # take the closest value to the left and to the right, except values in delimitations
       prev_i = max(setdiff(1:delim, delimitations))
       post_i = min(setdiff(delim:length(s), delimitations))

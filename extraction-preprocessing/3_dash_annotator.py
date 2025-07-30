@@ -6,7 +6,12 @@ import os
 import json
 import numpy as np
 from datetime import datetime
+import re
 # import shutil
+
+# TODO add peak: check if overlapping
+# TODO add peak: reorder automatically
+# TODO review (confirm) mode => gray out and prevent modifications
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 
@@ -250,6 +255,7 @@ def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_
                 color_discrete_map[f"Peak {i+1}"] = peak_alt_color
 
     fig = px.line(plot_df, x="Relative time", y=y_cols, color_discrete_map=color_discrete_map)
+    fig.update_traces(line=dict(width=1), selector=dict(name='Relative intensity'))
     fig.update_xaxes(title='', visible=True, showticklabels=True,
                      showline=True,
                      linecolor='black',
@@ -279,13 +285,46 @@ def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_
 
 
 def comments_to_spans(comments, keyword="(IgG|IgA|IgM|kappa|Kappa|lambda|Lambda)"):
-    import re
-
     spans = []
     for com_txt in comments:
         new_span = [html.Span(txt, style={"color": ("red" if i % 2 == 1 else "black")}) for i, txt in enumerate(re.split(keyword, com_txt))]
         spans.append(new_span)
     return spans
+
+
+def look_for_hc_lc_in_comments(comments, hc_keys = "(IgG|IgA|IgM)", lc_keys = "([kK][aA][pP][pP][aA]|[lL][aA][mM][bB][dD][aA])"):
+    # get list of unique HC
+    found_hc = list(set(re.findall(hc_keys, comments)))
+    # get list of unique LC
+    found_lc = list(set([lc[0].upper() for lc in re.findall(lc_keys, comments)]))
+    # return
+    return found_hc, found_lc
+
+
+def qc_peak_info(rows, MIN_PEAK_POS=150, MAX_PEAK_POS=299):
+    # make sure types are OK
+    for row in rows:
+        row["start"] = int(row["start"])
+        row["end"] = int(row["end"])
+    # qc values
+    for row in rows:
+        if (row["start"] < MIN_PEAK_POS) or (row["start"] < MIN_PEAK_POS) or (row["end"] > MAX_PEAK_POS) or (row["end"] > MAX_PEAK_POS):
+            return None, "Unable to save annotations: invalid peak position"
+        if int(row["start"]) >= int(row["end"]):
+            return None, "Unable to save annotations: invalid peak size"
+        if row["hc"] not in ["IgG", "IgA", "IgM", ""]:
+            return None, "Unable to save annotations: invalid peak HC: " + f'"{row["hc"]}"'
+        if row["lc"] not in ["K", "L"]:
+            return None, "Unable to save annotations: invalid peak LC: " + f'"{row["lc"]}"'
+        if (row["hc"] == "") and (row["lc"] == ""):
+            return None, "Unable to save annotations: HC and LC cannot be both missing"
+    # automatically reorder by start position
+    rows = [rows[i] for i in np.argsort([r["start"] for r in rows])]
+    # check if overlapping
+    if not np.all(np.diff([v for row in rows for v in [row['start'], row['end']]]) > 0):
+        return None, "Unable to save annotations: peak positions overlapping"
+    # send back clean data
+    return rows, None
 
 
 @callback(
@@ -320,24 +359,18 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
             if (reviewer_id is None) or (reviewer_id == ""):
                 error_dialog_msg = "Please enter a reviewer name"
                 return True, error_dialog_msg, prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
-            for row in rows:
-                if (int(row["start"]) <= 150) or (int(row["end"]) <= 150) or (int(row["start"]) >= 300) or (int(row["end"]) >= 300):
-                    return True, "Unable to save annotations: invalid peak position", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
-                if int(row["start"]) >= int(row["end"]):
-                    return True, "Unable to save annotations: invalid peak size", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
-                if row["hc"] not in ["IgG", "IgA", "IgM", ""]:
-                    return True, "Unable to save annotations: invalid peak HC", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
-                if row["lc"] not in ["K", "L", ""]:
-                    return True, "Unable to save annotations: invalid peak LC", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
-                if (row["hc"] == "") and (row["lc"] == ""):
-                    return True, "Unable to save annotations: HC and LC cannot be both missing", prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
+
+            # qc and clean peak data
+            peak_data, peak_data_err = qc_peak_info(rows)
+            if peak_data_err is not None:
+                return True, peak_data_err, prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
 
             if mode == "annotate":
                 # reload json input file and add new annotations to it
                 with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
                     json_content = json.load(f)
                 # create json content
-                json_content["peak_data"] = rows
+                json_content["peak_data"] = peak_data
                 json_content["doubtful"] = "Doubtful" in comments_checkbox
                 json_content["exclude"] = "Exclude" in comments_checkbox
                 json_content["annotated_by"] = reviewer_id
@@ -346,8 +379,10 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
                 with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
                     json.dump(json_content, f, indent=4)
             elif mode == "confirm":  # copy in validated folder
+                # OLD VERSION -- SIMPLY COPY
                 # shutil.copy(os.path.join(json_rootdirectory, "output_jsons", json_filename),
                 #             os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
+                # LESS OLD VERSION -- REOPEN AND ADD REVIEWER ID AND REVIEWING DATE
                 # new with reviewer name
                 # reload json input file and add new annotations to it
                 with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), "r") as f:
@@ -355,6 +390,7 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
                 # add reviewer name
                 json_content["confirmed_by"] = reviewer_id
                 json_content["confirmed_at"] = f"{datetime.now()}"
+                # TODO NEW VERSION -- REDO SO WE'LL INCLUDE MODIFICATIONS ? OR SHOULD WE JUST DISCARD THE ANNOTATIONS?
                 # save new json
                 with open(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename), 'w') as f:
                     json.dump(json_content, f, indent=4)
@@ -577,7 +613,7 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
     State('output-peaks-data-table', 'columns'),
     prevent_initial_call=True
 )
-def add_row(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_filename, rows, columns):
+def fill_peak_rows(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_filename, rows, columns):
 
     if add_n_clicks > 0:
         if ctx.triggered_id == "add-peak-button":  # we changed the json file => reset peaks
@@ -608,6 +644,20 @@ def add_row(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_filename
                     if start < 150:  # prevent peaks too early (e.g. albumin)
                         continue
                     rows.append({'start': start, 'end': end, 'hc': "", 'lc': ""})
+
+            # try to automatically populate HC and LC (if only 1 type of HC and LC mentioned in the comments) new 30_07_2025
+            with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
+                sample_data = json.load(f)
+
+            comments = sample_data["short_comments"] + " " + sample_data["long_comments"]
+            found_hc, found_lc = look_for_hc_lc_in_comments(comments)
+
+            if (len(found_hc) == 1) and (len(found_lc) == 1):  # exactly 1 HC and 1 LC
+                found_hc = found_hc[0]
+                found_lc = found_lc[0]
+                for row in rows:
+                    row["hc"] = found_hc
+                    row["lc"] = found_lc
 
     if previous_2020_n_clicks:
         if ctx.triggered_id == "previous-2020-to-peaks-button":  # we changed the json file => reset peaks
