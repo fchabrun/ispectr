@@ -31,6 +31,8 @@ use_python("C:/Users/flori/anaconda3/envs/py311_dash")
 db_file_path = "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/lemans_2025/EXPORT_DEIDENTIFIED_DATASET.csv"
 db_data = as.data.frame(fread(db_file_path, sep=","))
 
+# View(db_data[db_data$aaid == "AN_222f03d821d4f92b2069c7ffbc51971d", ])
+
 print(paste0("File contains ", nrow(db_data), " raw entries"))
 
 #check how many, etc.

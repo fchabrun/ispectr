@@ -9,9 +9,8 @@ from datetime import datetime
 import re
 # import shutil
 
-# TODO add peak: check if overlapping
-# TODO add peak: reorder automatically
 # TODO review (confirm) mode => gray out and prevent modifications
+# TODO go back an explore e.g. "AN_222f03d821d4f92b2069c7ffbc51971d" WHY NO DATA?
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 
@@ -31,6 +30,7 @@ json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\R
 #         input_json_content["doubtful"] = output_json_content["doubtful"]
 #         input_json_content["exclude"] = output_json_content["exclude"]
 #         input_json_content["annotated_by"] = output_json_content["annotated_by"]
+#         input_json_content["annotated_at"] = output_json_content["annotated_at"]
 #         # overwrite previous output (annotated) json
 #         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
 #             json.dump(input_json_content, f, indent=4)
@@ -292,7 +292,7 @@ def comments_to_spans(comments, keyword="(IgG|IgA|IgM|kappa|Kappa|lambda|Lambda)
     return spans
 
 
-def look_for_hc_lc_in_comments(comments, hc_keys = "(IgG|IgA|IgM)", lc_keys = "([kK][aA][pP][pP][aA]|[lL][aA][mM][bB][dD][aA])"):
+def look_for_hc_lc_in_comments(comments, hc_keys="(IgG|IgA|IgM)", lc_keys="([kK][aA][pP][pP][aA]|[lL][aA][mM][bB][dD][aA])"):
     # get list of unique HC
     found_hc = list(set(re.findall(hc_keys, comments)))
     # get list of unique LC
@@ -304,8 +304,11 @@ def look_for_hc_lc_in_comments(comments, hc_keys = "(IgG|IgA|IgM)", lc_keys = "(
 def qc_peak_info(rows, MIN_PEAK_POS=150, MAX_PEAK_POS=299):
     # make sure types are OK
     for row in rows:
-        row["start"] = int(row["start"])
+        row["start"] = int(row["start"])  # make sure peak locators are numeric
         row["end"] = int(row["end"])
+        if (row["hc"] is None):  # replace None by ""
+            row["hc"] = ""
+        # do not replace lc: should never be missing (peak can be FLC but not HC only (in this context)
     # qc values
     for row in rows:
         if (row["start"] < MIN_PEAK_POS) or (row["start"] < MIN_PEAK_POS) or (row["end"] > MAX_PEAK_POS) or (row["end"] > MAX_PEAK_POS):
