@@ -15,9 +15,9 @@ import re
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 
 # LE MANS 2025:
-# json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation"
+json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation"
 # CAPE TOWN 2025:
-json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation"
+# json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation"
 
 
 # if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
