@@ -329,9 +329,9 @@ def qc_peak_info(rows, MIN_PEAK_POS=150, MAX_PEAK_POS=299):
             return None, "Unable to save annotations: HC and LC cannot be both missing"
     # automatically reorder by start position
     rows = [rows[i] for i in np.argsort([r["start"] for r in rows])]
-    # check if overlapping
-    if not np.all(np.diff([v for row in rows for v in [row['start'], row['end']]]) > 0):
-        return None, "Unable to save annotations: peak positions overlapping"
+    # check if overlapping  # now authorized on august 1st due to SA sample SA02611879
+    # if not np.all(np.diff([v for row in rows for v in [row['start'], row['end']]]) > 0):
+    #     return None, "Unable to save annotations: peak positions overlapping"
     # send back clean data
     return rows, None
 
