@@ -74,6 +74,8 @@ def SPECTR_FOR_IT(input_directory, output_directory, model_path, loaded_models=N
     results = np.concatenate(results, axis=0)
 
     # export
+    print("Creating output directory if not already existing")
+    os.makedirs(output_directory, exist_ok=True)
     print('Exporting results to files')
     for i, json_info in tqdm(enumerate(json_metadata), total=len(json_metadata)):
         json_content = {"paid": json_info["paid"],
@@ -91,9 +93,13 @@ if __name__ == "__main__":
     parser.add_argument("--host")
     parser.add_argument("--port")
     parser.add_argument("--mode")
-    parser.add_argument("--input_json_dir", type=str, default=r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation\input_jsons")
-    parser.add_argument("--output_json_dir", type=str, default=r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation\spectr_jsons")
     parser.add_argument("--model_path", type=str, default=r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\code\SPECTR\R\SPECTRWebApp2023\tflite")
+    # LE MANS 2025:
+    # parser.add_argument("--input_json_dir", type=str, default=r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation\input_jsons")
+    # parser.add_argument("--output_json_dir", type=str, default=r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation\spectr_jsons")
+    # CAPE TOWN 2025:
+    parser.add_argument("--input_json_dir", type=str, default=r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation\input_jsons")
+    parser.add_argument("--output_json_dir", type=str, default=r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation\spectr_jsons")
 
     FLAGS = parser.parse_args()
 
