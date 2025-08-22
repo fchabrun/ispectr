@@ -149,6 +149,7 @@ for (iter_i in 1:length(unique_aaids)) {
                                        (nchar(aaid_subset[aaid_subset$analysis_sequence == "L", ]$raw_curve) == 1200))
   
   if (required_traces_are_present & required_traces_are_consistent) {
+    
     exactly_1_spe_trace_is_present <- all(aaid_subset$n_spe == 1)
     exactly_1_ref_trace_is_present <- all(aaid_subset$n_ref == 1)
     
@@ -223,6 +224,18 @@ for (iter_i in 1:length(unique_aaids)) {
     # extract short and long comments
     short_comments <- std_comment(aaid_subset$comment_1)
     long_comments <- std_comment(aaid_subset$comment_long)
+    
+    # Find other comments for the same patients, if any
+    iter_paid <- aaid_subset$paid[1]
+    paid_subset <- db_data[db_data$paid == iter_paid & !(db_data$aaid == iter_aaid), ]
+    if (nrow(paid_subset) > 0) {
+      other_short_comments <- std_comment(paid_subset$comment_1)
+      other_long_comments <- std_comment(paid_subset$comment_long)
+    } else {
+      other_short_comments <- NULL
+      other_long_comments <- NULL
+    }
+    
     # extract other important information
     age <- uniquify_value(aaid_subset$age_sampling)
     sex <- uniquify_value(aaid_subset$sex)
@@ -236,6 +249,8 @@ for (iter_i in 1:length(unique_aaids)) {
                              total_protein = tp,
                              short_comments = short_comments,
                              long_comments = long_comments,
+                             patient_other_short_comments = other_short_comments,
+                             patient_other_long_comments = other_long_comments,
                              traces=list(ELP = list(exists=T, data=elp_trace),
                                          IgG = list(exists=T, data=g_trace),
                                          IgA = list(exists=T, data=a_trace),

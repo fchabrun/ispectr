@@ -1,3 +1,7 @@
+"""
+Code Floris 2025
+"""
+
 from dash import Dash, html, dcc, callback, Output, Input, State, dash_table, ctx
 # import dash_bootstrap_components as dbc
 import plotly.express as px
@@ -10,7 +14,6 @@ import re
 # import shutil
 
 # TODO review (confirm) mode => gray out and prevent modifications
-# TODO go back an explore e.g. "AN_222f03d821d4f92b2069c7ffbc51971d" WHY NO DATA?
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 
@@ -19,9 +22,11 @@ json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\R
 # CAPE TOWN 2025:
 # json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation"
 
-
+# OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 # if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
-#     for json_filename in os.listdir(os.path.join(json_rootdirectory, "output_jsons")):
+#     from tqdm import tqdm
+#
+#     for json_filename in tqdm(os.listdir(os.path.join(json_rootdirectory, "output_jsons"))):
 #         # load input json
 #         with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
 #             input_json_content = json.load(f)
@@ -34,12 +39,47 @@ json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\R
 #         input_json_content["exclude"] = output_json_content["exclude"]
 #         input_json_content["annotated_by"] = output_json_content["annotated_by"]
 #         input_json_content["annotated_at"] = output_json_content["annotated_at"]
+#         # input_json_content["confirmed_by"] = output_json_content["confirmed_by"]  # not in output files (only confirmed files)
+#         # input_json_content["confirmed_at"] = output_json_content["confirmed_at"]  # not in output files (only confirmed files)
 #         # overwrite previous output (annotated) json
 #         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
 #             json.dump(input_json_content, f, indent=4)
 
+# ADD_PLUS_TWO_TO_AUTO_PEAKS = False
+# if ADD_PLUS_TWO_TO_AUTO_PEAKS:
+#     from tqdm import tqdm
+#
+#     for json_filename in tqdm(os.listdir(os.path.join(json_rootdirectory, "output_jsons"))):
+#         # load input json
+#         with open(os.path.join(json_rootdirectory, "spectr_jsons", json_filename), "r") as f:
+#             spectr_json_content = json.load(f)
+#         # load output (annotated) json
+#         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), "r") as f:
+#             output_json_content = json.load(f)
+#
+#         spectr_json_content["elp_spep_s_predictions"]
+#         spectr_elp_preds = np.array(spectr_json_content["elp_spep_s_predictions"])
+#         peak_starts, peak_ends = gate_peaks_from_spectr_preds(spectr_elp_preds)
+#
+#         # now compare with peak ends annotations
+#         # automatically add +2
+#         edits = False
+#         for peak_info in output_json_content["peak_data"]:
+#             if peak_info["end"] in peak_ends:
+#                 peak_info["end"] += 2
+#                 edits = True
+#
+#         if edits:
+#             output_json_content["peak_ends_updated_plus2"] = True
+#         else:
+#             output_json_content["peak_ends_updated_plus2"] = False
+#         # overwrite previous output (annotated) json
+#         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
+#             json.dump(output_json_content, f, indent=4)
+
 
 def json_file_lists_to_dropdown_options(full_json_list, mode):
+
     json_list_dropdown_data = []
     for json_info in full_json_list:
         if mode == "annotate":
@@ -109,8 +149,8 @@ sidebar = html.Div(
         dcc.Dropdown([], "", id='json-dropdown-selection'),
         html.Div(id='reviewer-id-text', style={'font-style': 'italic'}),
         html.Hr(),
-        html.Button('Populate from SPECTR', id='spectr-to-peaks-button', n_clicks=0),
         html.Button('Populate from PREVIOUS (2020)', id='previous-2020-to-peaks-button', n_clicks=0),
+        html.Button('Populate from SPECTR', id='spectr-to-peaks-button', n_clicks=0),
         html.Br(),
         html.Br(),
         dash_table.DataTable(
@@ -177,8 +217,12 @@ sidebar = html.Div(
         html.Hr(),
         html.P(id="old-lemans-text"),
         html.P("Comments", style={"font-weight": "bold"}),
-        html.P(id="short-comments-text"),
-        html.P(id="long-comments-text"),
+        html.Div([
+            html.P(id="short-comments-text"),
+            html.P(id="long-comments-text"),
+            html.P(id="other-short-comments-text"),
+            html.P(id="other-long-comments-text"),
+        ], style={"overflow-y": "auto", "height": "32rem"}),
     ],
     style=SIDEBAR_STYLE,
 )
@@ -290,8 +334,11 @@ def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_
     return fig
 
 
-def comments_to_spans(comments, keyword="(IgG|IgA|IgM|kappa|Kappa|lambda|Lambda)"):
-    spans = []
+def comments_to_spans(comments, prefix_name, keyword="(IgG|IgA|IgM|kappa|Kappa|lambda|Lambda)"):
+    if prefix_name is None:
+        spans = []
+    else:
+        spans = [html.Span(prefix_name, style={"color": "black", "font-style": "italic"}),]
     for com_txt in comments:
         new_span = [html.Span(txt, style={"color": ("red" if i % 2 == 1 else "black")}) for i, txt in enumerate(re.split(keyword, com_txt))]
         spans.append(new_span)
@@ -334,6 +381,50 @@ def qc_peak_info(rows, MIN_PEAK_POS=150, MAX_PEAK_POS=299):
     #     return None, "Unable to save annotations: peak positions overlapping"
     # send back clean data
     return rows, None
+
+
+# def gate_peaks_from_spectr_preds(spectr_elp_preds):
+#     # clean and get predicted positions
+#     spectr_elp_preds = (spectr_elp_preds > .1) * 1
+#     # compute diff (increase/decrease)
+#     spectr_elp_preds_diff = np.diff(spectr_elp_preds)
+#     # compute start and end positions
+#     peak_starts = np.where(spectr_elp_preds_diff == 1)[0]
+#     peak_ends = np.where(spectr_elp_preds_diff == -1)[0]
+#     out_peak_starts, out_peak_ends = [], []
+#     if len(peak_starts) == len(peak_ends):  # only act if n(starts) == n(ends)
+#         for start, end in zip(peak_starts, peak_ends):
+#             if end <= start:  # prevent errors
+#                 continue
+#             if end > 299:  # prevent peaks outside of the spep
+#                 continue
+#             if start < 150:  # prevent peaks too early (e.g. albumin)
+#                 continue
+#             out_peak_starts.append(int(start))
+#             out_peak_ends.append(int(end))
+#     return out_peak_starts, out_peak_ends
+
+
+def gate_peaks_from_spectr_preds_update_plus2(spectr_elp_preds):
+    # clean and get predicted positions
+    spectr_elp_preds = (spectr_elp_preds > .1) * 1
+    # compute diff (increase/decrease)
+    spectr_elp_preds_diff = np.diff(spectr_elp_preds)
+    # compute start and end positions
+    peak_starts = np.where(spectr_elp_preds_diff == 1)[0]
+    peak_ends = np.where(spectr_elp_preds_diff == -1)[0] + 2
+    out_peak_starts, out_peak_ends = [], []
+    if len(peak_starts) == len(peak_ends):  # only act if n(starts) == n(ends)
+        for start, end in zip(peak_starts, peak_ends):
+            if end <= start:  # prevent errors
+                continue
+            if end > 299:  # prevent peaks outside of the spep
+                continue
+            if start < 150:  # prevent peaks too early (e.g. albumin)
+                continue
+            out_peak_starts.append(int(start))
+            out_peak_ends.append(int(end))
+    return out_peak_starts, out_peak_ends
 
 
 @callback(
@@ -399,7 +490,6 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
                 # add reviewer name
                 json_content["confirmed_by"] = reviewer_id
                 json_content["confirmed_at"] = f"{datetime.now()}"
-                # TODO NEW VERSION -- REDO SO WE'LL INCLUDE MODIFICATIONS ? OR SHOULD WE JUST DISCARD THE ANNOTATIONS?
                 # save new json
                 with open(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename), 'w') as f:
                     json.dump(json_content, f, indent=4)
@@ -482,6 +572,8 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
     Output('spe-graph-content', 'figure'),
     Output('short-comments-text', 'children'),
     Output('long-comments-text', 'children'),
+    Output('other-short-comments-text', 'children'),
+    Output('other-long-comments-text', 'children'),
     Output('old-lemans-text', 'children'),
     Input('json-dropdown-selection', 'value'),
     Input('output-peaks-data-table', 'data'),
@@ -546,20 +638,25 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
     else:
         assert False, f"Unknown {mode=}"
 
-    short_comments = sample_data["short_comments"]
-    long_comments = sample_data["long_comments"]
+    comments_paragraph_list = []
+    for com_field, com_prefix in zip(["short_comments", "long_comments", "patient_other_short_comments", "patient_other_long_comments"],
+                             ["(SPEP)", "(IT)", "(PAID SPEP)", "(PAID IT)"]):
+        comments_text = sample_data[com_field]
 
-    # separate comments by lines
-    short_comments = [txt for txt in short_comments.split("\\n") if len(txt) > 0]
-    long_comments = [txt for txt in long_comments.split("\\n") if len(txt) > 0]
+        if comments_text is None:
+            comments_text = "---No data---"
 
-    # look for keywords
-    short_spans = comments_to_spans(short_comments)
-    long_spans = comments_to_spans(long_comments)
+        # separate comments by lines
+        comments_lines = [txt for txt in comments_text.split("\\n") if len(txt) > 0]
 
-    # format as paragraphs
-    short_comments = [html.P(span, style={"padding": "0", "margin": "0.5rem 0"}) for span in short_spans]
-    long_comments = [html.P(span, style={"padding": "0", "margin": "0.5rem 0"}) for span in long_spans]
+        # look for keywords
+        comments_spans = comments_to_spans(comments_lines, prefix_name=com_prefix)
+
+        # format as paragraphs
+        comments_paragraph = [html.P(span, style={"padding": "0", "margin": "0.5rem 0"}) for span in comments_spans]
+
+        # add to list
+        comments_paragraph_list.append(comments_paragraph)
 
     # load spectr data
     with open(os.path.join(json_rootdirectory, "spectr_jsons", json_filename), "r") as f:
@@ -609,7 +706,7 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
         old_lemans_text = None
         lemans_button_style = dict(display='none')
 
-    return rows, comments_checkbox, lemans_button_style, reviewer_id, *traces, short_comments, long_comments, old_lemans_text
+    return rows, comments_checkbox, lemans_button_style, reviewer_id, *traces, *comments_paragraph_list, old_lemans_text
 
 
 @callback(
@@ -637,22 +734,26 @@ def fill_peak_rows(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_f
                 sample_spectr_data = json.load(f)
             # extract prediction map
             spectr_elp_preds = np.array(sample_spectr_data["elp_spep_s_predictions"])
-            # clean and get predicted positions
-            spectr_elp_preds = (spectr_elp_preds > .1) * 1
-            # compute diff (increase/decrease)
-            spectr_elp_preds_diff = np.diff(spectr_elp_preds)
-            # compute start and end positions
-            peak_starts = np.where(spectr_elp_preds_diff == 1)[0]
-            peak_ends = np.where(spectr_elp_preds_diff == -1)[0]
-            if len(peak_starts) == len(peak_ends):  # only act if n(starts) == n(ends)
-                for start, end in zip(peak_starts, peak_ends):
-                    if end <= start:  # prevent errors
-                        continue
-                    if end > 299:  # prevent peaks outside of the spep
-                        continue
-                    if start < 150:  # prevent peaks too early (e.g. albumin)
-                        continue
-                    rows.append({'start': start, 'end': end, 'hc': "", 'lc': ""})
+            # # clean and get predicted positions
+            # spectr_elp_preds = (spectr_elp_preds > .1) * 1
+            # # compute diff (increase/decrease)
+            # spectr_elp_preds_diff = np.diff(spectr_elp_preds)
+            # # compute start and end positions
+            # peak_starts = np.where(spectr_elp_preds_diff == 1)[0]
+            # peak_ends = np.where(spectr_elp_preds_diff == -1)[0]
+            # if len(peak_starts) == len(peak_ends):  # only act if n(starts) == n(ends)
+            #     for start, end in zip(peak_starts, peak_ends):
+            #         if end <= start:  # prevent errors
+            #             continue
+            #         if end > 299:  # prevent peaks outside of the spep
+            #             continue
+            #         if start < 150:  # prevent peaks too early (e.g. albumin)
+            #             continue
+            #         rows.append({'start': start, 'end': end, 'hc': "", 'lc': ""})
+
+            peak_starts, peak_ends = gate_peaks_from_spectr_preds_update_plus2(spectr_elp_preds)  # edit 22 aug 2025
+            for start, end in zip(peak_starts, peak_ends):
+                rows.append({'start': start, 'end': end, 'hc': "", 'lc': ""})
 
             # try to automatically populate HC and LC (if only 1 type of HC and LC mentioned in the comments) new 30_07_2025
             with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
