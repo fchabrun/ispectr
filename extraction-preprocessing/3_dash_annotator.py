@@ -11,6 +11,7 @@ import json
 import numpy as np
 from datetime import datetime
 import re
+from tqdm import tqdm
 # import shutil
 
 # TODO review (confirm) mode => gray out and prevent modifications
@@ -76,6 +77,68 @@ json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\R
 #         # overwrite previous output (annotated) json
 #         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
 #             json.dump(output_json_content, f, indent=4)
+
+# ADD_PLUS_TWO_TO_PREV_PEAKS = False
+# if ADD_PLUS_TWO_TO_PREV_PEAKS:
+#
+#     def gate_peaks_from_spectr_preds(spectr_elp_preds):
+#         # clean and get predicted positions
+#         spectr_elp_preds = (spectr_elp_preds > .1) * 1
+#         # compute diff (increase/decrease)
+#         spectr_elp_preds_diff = np.diff(spectr_elp_preds)
+#         # compute start and end positions
+#         peak_starts = np.where(spectr_elp_preds_diff == 1)[0]
+#         peak_ends = np.where(spectr_elp_preds_diff == -1)[0]
+#         out_peak_starts, out_peak_ends = [], []
+#         if len(peak_starts) == len(peak_ends):  # only act if n(starts) == n(ends)
+#             for start, end in zip(peak_starts, peak_ends):
+#                 if end <= start:  # prevent errors
+#                     continue
+#                 if end > 299:  # prevent peaks outside of the spep
+#                     continue
+#                 if start < 150:  # prevent peaks too early (e.g. albumin)
+#                     continue
+#                 out_peak_starts.append(int(start))
+#                 out_peak_ends.append(int(end))
+#         return out_peak_starts, out_peak_ends
+#
+#     modified = []
+#     for json_filename in tqdm(os.listdir(os.path.join(json_rootdirectory, "output_jsons"))):
+#         # load input json
+#         if not os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename)):
+#             continue
+#         with open(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename), "r") as f:
+#             prev_json_content = json.load(f)
+#         # load output (annotated) json
+#         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), "r") as f:
+#             output_json_content = json.load(f)
+#
+#         prev_peak_locs = []
+#         for isotype in ["IgG", "IgA", "IgM", "K", "L"]:
+#             iso_trace = np.array(prev_json_content["groundtruth_maps"][isotype])
+#             peak_starts, peak_ends = gate_peaks_from_spectr_preds(iso_trace)
+#             for peak_start, peak_end in zip(peak_starts, peak_ends):
+#                 prev_peak_locs.append((peak_start, peak_end))
+#
+#         # now compare with peak ends annotations
+#         # automatically add +2
+#         edits = False
+#         for peak_info in output_json_content["peak_data"]:
+#             for prev_peak_info in prev_peak_locs:
+#                 if (peak_info["start"] == prev_peak_info[0]) and (peak_info["end"] == prev_peak_info[1]):
+#                     peak_info["end"] += 2
+#                     edits = True
+#
+#         if edits:
+#             modified.append(json_filename)
+#             output_json_content["prev_peak_ends_updated_plus2"] = True
+#         else:
+#             output_json_content["prev_peak_ends_updated_plus2"] = False
+#         # overwrite previous output (annotated) json
+#         with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
+#             json.dump(output_json_content, f, indent=4)
+#
+#     len(modified)  # 84
 
 
 def json_file_lists_to_dropdown_options(full_json_list, mode):
@@ -381,28 +444,6 @@ def qc_peak_info(rows, MIN_PEAK_POS=150, MAX_PEAK_POS=299):
     #     return None, "Unable to save annotations: peak positions overlapping"
     # send back clean data
     return rows, None
-
-
-# def gate_peaks_from_spectr_preds(spectr_elp_preds):
-#     # clean and get predicted positions
-#     spectr_elp_preds = (spectr_elp_preds > .1) * 1
-#     # compute diff (increase/decrease)
-#     spectr_elp_preds_diff = np.diff(spectr_elp_preds)
-#     # compute start and end positions
-#     peak_starts = np.where(spectr_elp_preds_diff == 1)[0]
-#     peak_ends = np.where(spectr_elp_preds_diff == -1)[0]
-#     out_peak_starts, out_peak_ends = [], []
-#     if len(peak_starts) == len(peak_ends):  # only act if n(starts) == n(ends)
-#         for start, end in zip(peak_starts, peak_ends):
-#             if end <= start:  # prevent errors
-#                 continue
-#             if end > 299:  # prevent peaks outside of the spep
-#                 continue
-#             if start < 150:  # prevent peaks too early (e.g. albumin)
-#                 continue
-#             out_peak_starts.append(int(start))
-#             out_peak_ends.append(int(end))
-#     return out_peak_starts, out_peak_ends
 
 
 def gate_peaks_from_spectr_preds_update_plus2(spectr_elp_preds):
@@ -784,7 +825,7 @@ def fill_peak_rows(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_f
                     iso_trace_diff = np.diff(iso_trace)
                     # compute start and end positions
                     peak_starts = np.where(iso_trace_diff == 1)[0]
-                    peak_ends = np.where(iso_trace_diff == -1)[0]
+                    peak_ends = np.where(iso_trace_diff == -1)[0] + 2  # edit 22 aug 2025
                     if len(peak_starts) == len(peak_ends):  # only act if n(starts) == n(ends)
                         for start, end in zip(peak_starts, peak_ends):
                             if end <= start:  # prevent errors
