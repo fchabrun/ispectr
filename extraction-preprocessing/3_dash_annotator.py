@@ -2,12 +2,12 @@
 Code Floris 2025
 """
 
-from dash import Dash, html, dcc, callback, Output, Input, State, dash_table, ctx
+from dash import Dash, html, dcc, callback, Output, Input, State, dash_table, ctx, no_update
 # import dash_bootstrap_components as dbc
 import plotly.express as px
 import pandas as pd
 import os
-import json
+import ujson as json
 import numpy as np
 from datetime import datetime
 import re
@@ -17,11 +17,18 @@ from tqdm import tqdm
 # TODO review (confirm) mode => gray out and prevent modifications
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
+root_paths = [r"C:\Users\flori", r"C:\Users\f.chabrun", ]
+valid_root_path = False
+for root_path in root_paths:
+    if os.path.exists(root_path):
+        valid_root_path = True
+        break
+assert valid_root_path, "Unable to find data location"
 
 # LE MANS 2025:
-json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation"
+json_rootdirectory = os.path.join(root_path, r"OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation")
 # CAPE TOWN 2025:
-# json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation"
+# json_rootdirectory = os.path.join(root_path, r"OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation")
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 # if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
@@ -140,6 +147,19 @@ json_rootdirectory = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\R
 #
 #     len(modified)  # 84
 
+# count doubtful
+# annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+# n_doubtful, n_confident = 0, 0
+# for json_fn in tqdm(annotated_json_filenames):
+#     with open(os.path.join(json_rootdirectory, "output_jsons", json_fn), "r") as f:
+#         buffer_data = json.load(f)
+#     if buffer_data["doubtful"]:
+#         n_doubtful += 1
+#     else:
+#         n_confident += 1
+# n_doubtful  # 540
+# n_doubtful / (n_doubtful + n_confident)  # 18%
+
 
 def json_file_lists_to_dropdown_options(full_json_list, mode):
 
@@ -207,6 +227,7 @@ sidebar = html.Div(
             value='annotate',
             id="mode-radio"
         ),
+        dcc.Dropdown([], "", id='reviewer-selection'),
         html.Br(),
         html.Div(id='n-json-files-found'),
         dcc.Dropdown([], "", id='json-dropdown-selection'),
@@ -269,7 +290,8 @@ sidebar = html.Div(
         html.Button('Add peak', id='add-peak-button', n_clicks=0),
         html.Br(),
         html.Br(),
-        dcc.Checklist(['Doubtful', 'Exclude', ], [], id="comments-checkbox"),
+        dcc.Checklist([{'label': 'Doubtful', 'value': 'Doubtful', 'disabled': False},
+                       {'label': 'Exclude', 'value': 'Exclude', 'disabled': False}], [], id="comments-checkbox"),
         html.Div([
             html.Button('SAVE', id='save-output-button', n_clicks=0, style={"font-weight": "bold"}),
             html.Br(),
@@ -323,12 +345,17 @@ graphs_layout = html.Div(
     ]
 )
 
-content = html.Div([graphs_layout,
-                    ],
+content = html.Div([graphs_layout,],
                    id="page-content",
                    style=CONTENT_STYLE)
 
-app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
+app.layout = html.Div([dcc.Location(id="url"),
+                       dcc.Loading([sidebar, content],
+                                   id="general-loading",
+                                   type="default",
+                                   overlay_style={"visibility": "visible", "filter": "blur(2px)"},
+                                   ),
+                       ])
 
 
 def get_trace_plot(trace_data, doubtful, exclude, spectr_preds=None, trace_peak_data=None, peak_color="red", peak_alt_color="#cccccc"):
@@ -478,33 +505,51 @@ def gate_peaks_from_spectr_preds_update_plus2(spectr_elp_preds):
     Output('discard-output-button', 'children'),
     Output('save-output-button', 'style'),
     Output('discard-output-button', 'style'),
+    Output('reviewer-selection', 'options'),
+    Output('reviewer-selection', 'value'),
+    Output('reviewer-selection', 'style'),
+    Output("output-peaks-data-table", "editable"),
+    Output("output-peaks-data-table", "row_deletable"),
+    Output('previous-2020-to-peaks-button', 'disabled'),
+    Output('spectr-to-peaks-button', 'disabled'),
+    Output('add-peak-button', 'disabled'),
+    Output('comments-checkbox', 'options'),
+    Output("general-loading", "children"),
+    Input("general-loading", "value"),
     Input('save-output-button', 'n_clicks'),
     Input('discard-output-button', 'n_clicks'),
     Input('mode-radio', 'value'),
+    Input('reviewer-selection', 'value'),
     State('output-peaks-data-table', 'data'),
-    State('json-dropdown-selection', 'options'),
     State('json-dropdown-selection', 'value'),
     State('comments-checkbox', 'value'),
-    State('save-output-button', 'children'),
-    State('discard-output-button', 'children'),
-    State('save-output-button', 'style'),
-    State('discard-output-button', 'style'),
-    State('n-json-files-found', 'children'),
-    State('input-reviewer', 'value')
+    State('input-reviewer', 'value'),
 )
-def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows, prev_json_options, json_filename, comments_checkbox, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style, prev_n_json_txt, reviewer_id):
+def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_discard, mode, reviewer_selected,
+                                    rows, json_filename, comments_checkbox, reviewer_id):
+    if mode == "annotate":
+        updates_disable_ret = [True, True, False, False, False,
+                               [{'label': 'Doubtful', 'value': 'Doubtful', 'disabled': False},
+                                {'label': 'Exclude', 'value': 'Exclude', 'disabled': False}],
+                               ]
+    else:
+        updates_disable_ret = [False, False, True, True, True,
+                               [{'label': 'Doubtful', 'value': 'Doubtful', 'disabled': True},
+                                {'label': 'Exclude', 'value': 'Exclude', 'disabled': True}],
+                               ]
+
     # if save => save
     if (n_clicks_save > 0) or (n_clicks_discard > 0):
         if ctx.triggered_id == "save-output-button":
             # reject if annotations are not OK
             if (reviewer_id is None) or (reviewer_id == ""):
                 error_dialog_msg = "Please enter a reviewer name"
-                return True, error_dialog_msg, prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
+                return True, error_dialog_msg, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
             # qc and clean peak data
             peak_data, peak_data_err = qc_peak_info(rows)
             if peak_data_err is not None:
-                return True, peak_data_err, prev_n_json_txt, prev_json_options, json_filename, prev_save_button_txt, prev_discard_button_txt, prev_save_button_style, prev_discard_button_style
+                return True, peak_data_err, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
             if mode == "annotate":
                 # reload json input file and add new annotations to it
@@ -554,9 +599,9 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
         if len(json_options) > 10:
             n_json_files_found_txt = f"{len(json_options)} unannotated files found, displaying first 10"
             json_options = json_options[:10]
-            return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT', "", {"font-weight": "bold"}, {"display": 'none'}
-        n_json_files_found_txt = f"{len(json_options)} unannotated files found"
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT', "", {"font-weight": "bold"}, {"display": 'none'}
+        else:
+            n_json_files_found_txt = f"{len(json_options)} unannotated files found"
+        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT', "", {"font-weight": "bold"}, {"display": 'none'}, [], "", {"display": 'none'}, *updates_disable_ret, no_update
     elif mode == "confirm":
         # load list of json that were already annotated
         annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
@@ -564,20 +609,30 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
         # filter them out from the full list
         tmp_json_list = [e for e in full_json_list if (e["json_filename"] in annotated_json_filenames) and (e["json_filename"] not in confirmed_json_filenames)]
         # annotate exclude/doubtful
+        reviewers_list = ["(all)", ]
         for json_info in tmp_json_list:
             with open(os.path.join(json_rootdirectory, "output_jsons", json_info["json_filename"]), "r") as f:
                 saved_output_data = json.load(f)
             json_info["doubtful"] = saved_output_data["doubtful"]
             json_info["exclude"] = saved_output_data["exclude"]
+            # check annotator and retain list
+            json_info["annotated_by"] = saved_output_data["annotated_by"]
+            if saved_output_data["annotated_by"] not in reviewers_list:
+                reviewers_list.append(saved_output_data["annotated_by"])
+        if (reviewer_selected == "") or reviewer_selected not in reviewers_list:
+            reviewer_selected = "(all)"  # default -> (all)
+        # keep only selected reviewers
+        if reviewer_selected != "(all)":
+            tmp_json_list = [e for e in tmp_json_list if e["annotated_by"] == reviewer_selected]
         # color
         json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
         # send back
-        # if len(json_options) > 100:
-        #     n_json_files_found_txt = f"{len(json_options)} annotated files found, displaying first 100"
-        #     json_options = json_options[:100]
-        #     return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT", {"font-weight": "bold"}, {}
-        n_json_files_found_txt = f"{len(json_options)} annotated files found"
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT", {"font-weight": "bold"}, {}
+        if len(json_options) > 10:
+            n_json_files_found_txt = f"{len(json_options)} annotated files found, displaying first 10"
+            json_options = json_options[:10]
+        else:
+            n_json_files_found_txt = f"{len(json_options)} annotated files found"
+        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT", {"font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {}, *updates_disable_ret, no_update
     elif mode == "review":
         # load list of json that were already annotated
         annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
@@ -585,16 +640,26 @@ def save_and_update_json_files_list(n_clicks_save, n_clicks_discard, mode, rows,
         # filter them out from the full list
         tmp_json_list = [e for e in full_json_list if (e["json_filename"] in annotated_json_filenames) and (e["json_filename"] in confirmed_json_filenames)]
         # annotate exclude/doubtful
+        reviewers_list = ["(all)", ]
         for json_info in tmp_json_list:
-            with open(os.path.join(json_rootdirectory, "output_jsons", json_info["json_filename"]), "r") as f:
+            with open(os.path.join(json_rootdirectory, "confirmed_jsons", json_info["json_filename"]), "r") as f:
                 saved_output_data = json.load(f)
             json_info["doubtful"] = saved_output_data["doubtful"]
             json_info["exclude"] = saved_output_data["exclude"]
+            # check annotator and retain list
+            json_info["confirmed_by"] = saved_output_data["confirmed_by"]
+            if saved_output_data["confirmed_by"] not in reviewers_list:
+                reviewers_list.append(saved_output_data["confirmed_by"])
+        if (reviewer_selected == "") or reviewer_selected not in reviewers_list:
+            reviewer_selected = "(all)"  # default -> (all)
+        # keep only selected reviewers
+        if reviewer_selected != "(all)":
+            tmp_json_list = [e for e in tmp_json_list if e["confirmed_by"] == reviewer_selected]
         # color
         json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
         # send back
         n_json_files_found_txt = f"{len(json_options)} confirmed files found"
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", '', "DISCARD SAVED OUTPUT", {"display": 'none', "font-weight": "bold"}, {}
+        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", '', "DISCARD SAVED OUTPUT", {"display": 'none', "font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {}, *updates_disable_ret, no_update
 
 
 @callback(
@@ -631,7 +696,7 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
                 reviewer_id,
                 {}, {}, {}, {}, {}, {}, {}, {},
                 # None, None, None, None, None, None, None, None,
-                None, None, None)
+                None, None, None, None, None)
 
     saved_output_data = None
     if ctx.triggered_id == "json-dropdown-selection":  # we changed the json file => reset peaks

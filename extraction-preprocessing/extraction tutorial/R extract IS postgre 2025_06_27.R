@@ -71,20 +71,6 @@ raw_dataset = as.data.frame(fread(path_to_dump, sep="\t", skip=header_data$heade
 colnames(raw_dataset) <- header_data$header_columns
 print(paste0("Found data for ", nrow(raw_dataset), " total rows"))
 
-# print(paste(paste0("'", unique(raw_dataset[raw_dataset$nominativo == "xxx, xxx", ]$id), "'"), collapse=", "))
-# possible_ids <- c('0411002702', '0401054205', '0930078801', '1107107201', '0401054205-ELP', '1213100301', '0117113101', '0221080002', '0331088601', '0628089104', '1018106301', '1117108601', '0116015606')
-# id_filt <- NULL
-# for (candidate_id in possible_ids) {
-#   new_filt <- startsWith(raw_dataset$id, candidate_id)
-#   if (is.null(id_filt)) {
-#     id_filt <- new_filt
-#   } else {
-#     id_filt <- id_filt | new_filt
-#   }
-# }
-# tmp_data_export <- raw_dataset[id_filt, ]
-# write.csv(tmp_data_export, "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/2025/tmp/test_CHARTIER_ROLANDE.csv")
-
 # DISCARD UNUSED COLUMNS, AND RENAME THEM
 # DEFINE COLUMNS WE WANT TO KEEP
 cols_keep <- c("data_nascita", "programma", "data_prel", "nominativo", "data_analisi",
