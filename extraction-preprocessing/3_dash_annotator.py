@@ -9,8 +9,9 @@ import pandas as pd
 import os
 import ujson as json
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
+import time
 from tqdm import tqdm
 # import shutil
 
@@ -159,6 +160,32 @@ json_rootdirectory = os.path.join(root_path, r"OneDrive - univ-angers.fr\Documen
 #         n_confident += 1
 # n_doubtful  # 540
 # n_doubtful / (n_doubtful + n_confident)  # 18%
+
+
+class time_marker():
+    def __init__(self, task, auto_start=True):
+        if auto_start:
+            self.start()
+        self.task = task
+
+
+    def start(self):
+        self.t0 = time.time()
+        self.t_elapsed = -1
+
+
+    def end(self):
+        self.t_elapsed = time.time() - self.t0
+
+
+    def print(self, auto_end=True):
+        if auto_end:
+            self.end()
+        if self.t_elapsed > 0:
+            if self.t_elapsed < 1:
+                print(f"[{self.task}]: completed in {1000*self.t_elapsed:.0f} milliseconds")
+            else:
+                print(f"[{self.task}]: completed in {self.t_elapsed:.2f} seconds")
 
 
 def json_file_lists_to_dropdown_options(full_json_list, mode):
@@ -527,6 +554,7 @@ def gate_peaks_from_spectr_preds_update_plus2(spectr_elp_preds):
 )
 def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_discard, mode, reviewer_selected,
                                     rows, json_filename, comments_checkbox, reviewer_id):
+    sub0_timelapse = time_marker("UI refresh/global")
     if mode == "annotate":
         updates_disable_ret = [True, True, False, False, False,
                                [{'label': 'Doubtful', 'value': 'Doubtful', 'disabled': False},
@@ -540,15 +568,18 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
 
     # if save => save
     if (n_clicks_save > 0) or (n_clicks_discard > 0):
+        sub1_timelapse = time_marker("UI refresh/button push")
         if ctx.triggered_id == "save-output-button":
             # reject if annotations are not OK
             if (reviewer_id is None) or (reviewer_id == ""):
                 error_dialog_msg = "Please enter a reviewer name"
+                sub0_timelapse.print()
                 return True, error_dialog_msg, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
             # qc and clean peak data
             peak_data, peak_data_err = qc_peak_info(rows)
             if peak_data_err is not None:
+                sub0_timelapse.print()
                 return True, peak_data_err, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
             if mode == "annotate":
@@ -586,30 +617,44 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
             elif mode == "review":  # discard
                 os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
                 os.remove(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
+        sub1_timelapse.print()
 
     # according to review mode or not, determine the list of json files to show and the default (first) to choose
     if mode == "annotate":
         # load list of json that were already annotated
+        sub1_timelapse = time_marker("UI refresh/list files (annotate)")
         annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+        sub1_timelapse.print()
         # filter them out from the full list
+        sub1_timelapse = time_marker("UI refresh/file list -> UI (annotate)")
         tmp_json_list = [e for e in full_json_list if e["json_filename"] not in annotated_json_filenames]
+        sub1_timelapse.print()
         # color
+        sub1_timelapse = time_marker("UI refresh/file list -> color (annotate)")
         json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
+        sub1_timelapse.print()
         # send back
-        if len(json_options) > 10:
-            n_json_files_found_txt = f"{len(json_options)} unannotated files found, displaying first 10"
-            json_options = json_options[:10]
+        LIMIT_TO_N_FILES = 10  # we can set 10 max displayed
+        if len(json_options) > LIMIT_TO_N_FILES:
+            n_json_files_found_txt = f"{len(json_options)} unannotated files found, displaying first {LIMIT_TO_N_FILES}"
+            json_options = json_options[:LIMIT_TO_N_FILES]
         else:
             n_json_files_found_txt = f"{len(json_options)} unannotated files found"
+        sub0_timelapse.print()
         return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT', "", {"font-weight": "bold"}, {"display": 'none'}, [], "", {"display": 'none'}, *updates_disable_ret, no_update
     elif mode == "confirm":
         # load list of json that were already annotated
+        sub1_timelapse = time_marker("UI refresh/list output files (confirm)")
         annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+        sub1_timelapse.print()
+        sub1_timelapse = time_marker("UI refresh/list confirmed files (confirm)")
         confirmed_json_filenames = os.listdir(os.path.join(json_rootdirectory, "confirmed_jsons"))
+        sub1_timelapse.print()
         # filter them out from the full list
         tmp_json_list = [e for e in full_json_list if (e["json_filename"] in annotated_json_filenames) and (e["json_filename"] not in confirmed_json_filenames)]
         # annotate exclude/doubtful
         reviewers_list = ["(all)", ]
+        sub1_timelapse = time_marker("UI refresh/fetch json data (confirm)")
         for json_info in tmp_json_list:
             with open(os.path.join(json_rootdirectory, "output_jsons", json_info["json_filename"]), "r") as f:
                 saved_output_data = json.load(f)
@@ -619,19 +664,24 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
             json_info["annotated_by"] = saved_output_data["annotated_by"]
             if saved_output_data["annotated_by"] not in reviewers_list:
                 reviewers_list.append(saved_output_data["annotated_by"])
+        sub1_timelapse.print()
         if (reviewer_selected == "") or reviewer_selected not in reviewers_list:
             reviewer_selected = "(all)"  # default -> (all)
         # keep only selected reviewers
         if reviewer_selected != "(all)":
             tmp_json_list = [e for e in tmp_json_list if e["annotated_by"] == reviewer_selected]
         # color
+        sub1_timelapse = time_marker("UI refresh/file list -> color (confirm)")
         json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
+        sub1_timelapse.print()
         # send back
-        if len(json_options) > 10:
-            n_json_files_found_txt = f"{len(json_options)} annotated files found, displaying first 10"
-            json_options = json_options[:10]
+        LIMIT_TO_N_FILES = 9999  # we can set 10
+        if len(json_options) > LIMIT_TO_N_FILES:
+            n_json_files_found_txt = f"{len(json_options)} annotated files found, displaying first {LIMIT_TO_N_FILES}"
+            json_options = json_options[:LIMIT_TO_N_FILES]
         else:
             n_json_files_found_txt = f"{len(json_options)} annotated files found"
+        sub0_timelapse.print()
         return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT", {"font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {}, *updates_disable_ret, no_update
     elif mode == "review":
         # load list of json that were already annotated
@@ -659,6 +709,7 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
         json_options = json_file_lists_to_dropdown_options(tmp_json_list, mode=mode)
         # send back
         n_json_files_found_txt = f"{len(json_options)} confirmed files found"
+        sub0_timelapse.print()
         return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", '', "DISCARD SAVED OUTPUT", {"display": 'none', "font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {}, *updates_disable_ret, no_update
 
 
