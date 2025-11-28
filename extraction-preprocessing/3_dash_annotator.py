@@ -326,6 +326,7 @@ sidebar = html.Div(
         html.Br(),
         dcc.Checklist([{'label': 'Doubtful', 'value': 'Doubtful', 'disabled': False},
                        {'label': 'Exclude', 'value': 'Exclude', 'disabled': False}], [], id="comments-checkbox"),
+        html.Br(),
         html.Div([
             html.Button('SAVE', id='save-output-button', n_clicks=0, style={"font-weight": "bold"}),
             html.Br(),
