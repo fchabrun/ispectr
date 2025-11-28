@@ -13,9 +13,10 @@ from datetime import datetime, timedelta
 import re
 import time
 from tqdm import tqdm
-# import shutil
 
-# TODO review (confirm) mode => gray out and prevent modifications
+STORE_H5 = False
+if STORE_H5:
+    import h5py
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 root_paths = [r"C:\Users\flori", r"C:\Users\f.chabrun", ]
@@ -161,6 +162,8 @@ json_rootdirectory = os.path.join(root_path, r"OneDrive - univ-angers.fr\Documen
 # n_doubtful  # 540
 # n_doubtful / (n_doubtful + n_confident)  # 18%
 
+SHOW_ELAPSED_TIMES = True
+
 
 class time_marker():
     def __init__(self, task, auto_start=True):
@@ -181,11 +184,12 @@ class time_marker():
     def print(self, auto_end=True):
         if auto_end:
             self.end()
-        if self.t_elapsed > 0:
-            if self.t_elapsed < 1:
-                print(f"[{self.task}]: completed in {1000*self.t_elapsed:.0f} milliseconds")
-            else:
-                print(f"[{self.task}]: completed in {self.t_elapsed:.2f} seconds")
+        if SHOW_ELAPSED_TIMES:
+            if self.t_elapsed > 0:
+                if self.t_elapsed < 1:
+                    print(f"[{self.task}]: completed in {1000*self.t_elapsed:.0f} milliseconds")
+                else:
+                    print(f"[{self.task}]: completed in {self.t_elapsed:.2f} seconds")
 
 
 def json_file_lists_to_dropdown_options(full_json_list, mode):
@@ -214,6 +218,7 @@ if os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons")
     existingpreviousdata_json_filenames = os.listdir(os.path.join(json_rootdirectory, "previous_2020_output_jsons"))
 else:
     existingpreviousdata_json_filenames = []
+# add info of whether the files have prior pre-2020 annotations
 for json_filename in os.listdir(os.path.join(json_rootdirectory, "input_jsons")):
     full_json_list.append({"json_filename": json_filename, "previous": (json_filename in existingpreviousdata_json_filenames)})
 
@@ -255,6 +260,8 @@ sidebar = html.Div(
             id="mode-radio"
         ),
         dcc.Dropdown([], "", id='reviewer-selection'),
+        dcc.Checklist([{'label': 'Only doubtful/exclude', 'value': 'de_only'}],
+                       ['de_only'], id="de-only-checkbox"),
         html.Br(),
         html.Div(id='n-json-files-found'),
         dcc.Dropdown([], "", id='json-dropdown-selection'),
@@ -522,6 +529,121 @@ def gate_peaks_from_spectr_preds_update_plus2(spectr_elp_preds):
     return out_peak_starts, out_peak_ends
 
 
+def save_output_data(json_content, mode, reviewer_id):
+    print(f"save_output_data called with {mode=}")
+    if STORE_H5:
+        assert False, f"Unhandled {STORE_H5=} for saving output data"
+    else:
+        if mode == "annotate":
+            json_content["annotated_by"] = reviewer_id
+            json_content["annotated_at"] = f"{datetime.now()}"
+            # TODO not working anymore
+            fn = os.path.join(json_rootdirectory, "output_jsons", json_content['aaid'] + ".json")
+            print(f"saving to {fn}")
+            with open(fn, 'w') as f:
+                json.dump(json_content, f, indent=4)
+        elif mode == "confirm":
+            json_content["confirmed_by"] = reviewer_id
+            json_content["confirmed_at"] = f"{datetime.now()}"
+            fn = os.path.join(json_rootdirectory, "confirmed_jsons", json_content['aaid'] + ".json")
+            print(f"saving to {fn}")
+            with open(fn, 'w') as f:
+                json.dump(json_content, f, indent=4)
+        else:
+            assert False, f"Unhandled {mode=} for saving output data"
+
+
+def delete_stored_data(json_filename, mode):
+    if STORE_H5:
+        assert False, f"Unhandled {STORE_H5=} for deleting output data"
+    else:
+        if mode == "confirm":  # discard
+            os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
+        elif mode == "review":  # discard
+            os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
+            os.remove(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
+        else:
+            assert False, f"Unhandled {mode=} for deleting output data"
+
+
+def reload_output_data(json_filename, source):
+    if STORE_H5:
+        assert False, f"Unhandled {STORE_H5=} for reloading output data"
+    else:
+        if source == "unannotated":
+            with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
+                json_content = json.load(f)
+            return json_content
+        elif source == "annotated":
+            with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), "r") as f:
+                json_content = json.load(f)
+            return json_content
+        else:
+            assert False, f"{source=} is not a valid source"
+
+
+def parse_doubtul_excluded_files_and_reviewers_list(tmp_json_list, mode):
+    if STORE_H5:
+        assert False, f"Unhandled {STORE_H5=} for parsing output data"
+    else:
+        reviewers_list = ["(all)", ]
+        if mode == "confirm":
+            json_sub_path = "output_jsons"
+            reviewer_key = "annotated_by"
+        elif mode == "review":
+            json_sub_path = "confirmed_jsons"
+            reviewer_key = "confirmed_by"
+        else:
+            assert False, f"{mode=} is not a valid mode"
+
+        for json_info in tmp_json_list:
+            # new 27.11: only check if different
+            if ("doubtful" not in json_info.keys()) or ("exclude" not in json_info.keys()) or (reviewer_key not in json_info.keys()):
+                with open(os.path.join(json_rootdirectory, json_sub_path, json_info["json_filename"]), "r") as f:
+                    saved_output_data = json.load(f)
+                json_info["doubtful"] = saved_output_data["doubtful"]
+                json_info["exclude"] = saved_output_data["exclude"]
+                # check annotator and retain list
+                json_info[reviewer_key] = saved_output_data[reviewer_key]
+            if json_info[reviewer_key] not in reviewers_list:
+                reviewers_list.append(json_info[reviewer_key])
+
+        return tmp_json_list, reviewers_list
+
+
+def get_list_of_annotated_json_files(only_confirmed=False):
+    if STORE_H5:
+        assert False, f"Unhandled {STORE_H5=} for listing output data"
+    else:
+        if only_confirmed:
+            return os.listdir(os.path.join(json_rootdirectory, "confirmed_jsons"))
+        return os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+
+
+def load_json_data(json_filename, mode):
+    if STORE_H5:
+        assert False, f"Unhandled {STORE_H5=} for loading output data"
+    else:
+        load_dir = "input_jsons" if (mode == "annotate") else "output_jsons" if (mode == "confirm") else "confirmed_jsons"
+        with open(os.path.join(json_rootdirectory, load_dir, json_filename), "r") as f:
+            saved_data = json.load(f)
+        return saved_data
+
+
+def load_spectr_data(json_filename):
+    with open(os.path.join(json_rootdirectory, "spectr_jsons", json_filename), "r") as f:
+        saved_data = json.load(f)
+    return saved_data
+
+
+def load_previous_2020_annotations(json_filename):
+    if os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename)):
+        with open(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename), "r") as f:
+            saved_data = json.load(f)
+        return saved_data
+    return None
+
+
 @callback(
     Output('error-dialog', 'displayed'),
     Output('error-dialog', 'message'),
@@ -542,20 +664,22 @@ def gate_peaks_from_spectr_preds_update_plus2(spectr_elp_preds):
     Output('add-peak-button', 'disabled'),
     Output('comments-checkbox', 'options'),
     Output("general-loading", "children"),
+    Output('de-only-checkbox', 'style'),
     Input("general-loading", "value"),
     Input('save-output-button', 'n_clicks'),
     Input('discard-output-button', 'n_clicks'),
     Input('mode-radio', 'value'),
     Input('reviewer-selection', 'value'),
+    Input('de-only-checkbox', 'value'),
     State('output-peaks-data-table', 'data'),
     State('json-dropdown-selection', 'value'),
     State('comments-checkbox', 'value'),
     State('input-reviewer', 'value'),
 )
-def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_discard, mode, reviewer_selected,
+def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_discard, mode, reviewer_selected, de_only_checkbox,
                                     rows, json_filename, comments_checkbox, reviewer_id):
     sub0_timelapse = time_marker("UI refresh/global")
-    if mode == "annotate":
+    if mode in ("annotate", "confirm", ):
         updates_disable_ret = [True, True, False, False, False,
                                [{'label': 'Doubtful', 'value': 'Doubtful', 'disabled': False},
                                 {'label': 'Exclude', 'value': 'Exclude', 'disabled': False}],
@@ -574,27 +698,23 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
             if (reviewer_id is None) or (reviewer_id == ""):
                 error_dialog_msg = "Please enter a reviewer name"
                 sub0_timelapse.print()
-                return True, error_dialog_msg, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+                return True, error_dialog_msg, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
             # qc and clean peak data
             peak_data, peak_data_err = qc_peak_info(rows)
             if peak_data_err is not None:
                 sub0_timelapse.print()
-                return True, peak_data_err, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+                return True, peak_data_err, no_update, no_update, json_filename, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
             if mode == "annotate":
                 # reload json input file and add new annotations to it
-                with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
-                    json_content = json.load(f)
+                json_content = reload_output_data(json_filename=json_filename, source="unannotated")
                 # create json content
                 json_content["peak_data"] = peak_data
                 json_content["doubtful"] = "Doubtful" in comments_checkbox
                 json_content["exclude"] = "Exclude" in comments_checkbox
-                json_content["annotated_by"] = reviewer_id
-                json_content["annotated_at"] = f"{datetime.now()}"
-                # save new json
-                with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), 'w') as f:
-                    json.dump(json_content, f, indent=4)
+                # save
+                save_output_data(json_content=json_content, mode=mode, reviewer_id=reviewer_id)
             elif mode == "confirm":  # copy in validated folder
                 # OLD VERSION -- SIMPLY COPY
                 # shutil.copy(os.path.join(json_rootdirectory, "output_jsons", json_filename),
@@ -602,28 +722,23 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
                 # LESS OLD VERSION -- REOPEN AND ADD REVIEWER ID AND REVIEWING DATE
                 # new with reviewer name
                 # reload json input file and add new annotations to it
-                with open(os.path.join(json_rootdirectory, "output_jsons", json_filename), "r") as f:
-                    json_content = json.load(f)
-                # add reviewer name
-                json_content["confirmed_by"] = reviewer_id
-                json_content["confirmed_at"] = f"{datetime.now()}"
-                # save new json
-                with open(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename), 'w') as f:
-                    json.dump(json_content, f, indent=4)
+                json_content = reload_output_data(json_filename=json_filename, source="annotated")
+                # EVEN NEWER: JUST RECOMPUTE IN CASE WE CHANGED ANYTHING (AND ALLOW MODIFICATIONS)
+                json_content["peak_data"] = peak_data  # overwrite any changes
+                json_content["doubtful"] = "Doubtful" in comments_checkbox  # overwrite any changes
+                json_content["exclude"] = "Exclude" in comments_checkbox  # overwrite any changes
+                # save
+                save_output_data(json_content=json_content, mode=mode, reviewer_id=reviewer_id)
 
         if ctx.triggered_id == "discard-output-button":
-            if mode == "confirm":  # discard
-                os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
-            elif mode == "review":  # discard
-                os.remove(os.path.join(json_rootdirectory, "output_jsons", json_filename))
-                os.remove(os.path.join(json_rootdirectory, "confirmed_jsons", json_filename))
+            delete_stored_data(json_filename=json_filename, mode=mode)
         sub1_timelapse.print()
 
     # according to review mode or not, determine the list of json files to show and the default (first) to choose
     if mode == "annotate":
         # load list of json that were already annotated
         sub1_timelapse = time_marker("UI refresh/list files (annotate)")
-        annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+        annotated_json_filenames = get_list_of_annotated_json_files()
         sub1_timelapse.print()
         # filter them out from the full list
         sub1_timelapse = time_marker("UI refresh/file list -> UI (annotate)")
@@ -641,32 +756,31 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
         else:
             n_json_files_found_txt = f"{len(json_options)} unannotated files found"
         sub0_timelapse.print()
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE OUTPUT', "", {"font-weight": "bold"}, {"display": 'none'}, [], "", {"display": 'none'}, *updates_disable_ret, no_update
+        return (False, "", n_json_files_found_txt, json_options,
+                json_options[0]["value"] if len(json_options) > 0 else "", 'SAVE ANNOTATIONS', "",
+                {"font-weight": "bold"}, {"display": 'none'}, [], "", {"display": 'none'},
+                *updates_disable_ret, no_update, {"display": 'none'})
     elif mode == "confirm":
         # load list of json that were already annotated
         sub1_timelapse = time_marker("UI refresh/list output files (confirm)")
-        annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
+        annotated_json_filenames = get_list_of_annotated_json_files(only_confirmed=False)
         sub1_timelapse.print()
         sub1_timelapse = time_marker("UI refresh/list confirmed files (confirm)")
-        confirmed_json_filenames = os.listdir(os.path.join(json_rootdirectory, "confirmed_jsons"))
+        confirmed_json_filenames = get_list_of_annotated_json_files(only_confirmed=True)
         sub1_timelapse.print()
         # filter them out from the full list
         tmp_json_list = [e for e in full_json_list if (e["json_filename"] in annotated_json_filenames) and (e["json_filename"] not in confirmed_json_filenames)]
         # annotate exclude/doubtful
-        reviewers_list = ["(all)", ]
         sub1_timelapse = time_marker("UI refresh/fetch json data (confirm)")
-        for json_info in tmp_json_list:
-            with open(os.path.join(json_rootdirectory, "output_jsons", json_info["json_filename"]), "r") as f:
-                saved_output_data = json.load(f)
-            json_info["doubtful"] = saved_output_data["doubtful"]
-            json_info["exclude"] = saved_output_data["exclude"]
-            # check annotator and retain list
-            json_info["annotated_by"] = saved_output_data["annotated_by"]
-            if saved_output_data["annotated_by"] not in reviewers_list:
-                reviewers_list.append(saved_output_data["annotated_by"])
+        tmp_json_list, reviewers_list = parse_doubtul_excluded_files_and_reviewers_list(tmp_json_list=tmp_json_list, mode=mode)
         sub1_timelapse.print()
+        if "de_only" in de_only_checkbox:
+            tmp_json_list = [e for e in tmp_json_list if (e["doubtful"] or e["exclude"])]
         if (reviewer_selected == "") or reviewer_selected not in reviewers_list:
-            reviewer_selected = "(all)"  # default -> (all)
+            if "Master 1" in reviewers_list:
+                reviewer_selected = "Master 1"  # default -> Master 1, then (all)
+            else:
+                reviewer_selected = "(all)"  # default -> (all)
         # keep only selected reviewers
         if reviewer_selected != "(all)":
             tmp_json_list = [e for e in tmp_json_list if e["annotated_by"] == reviewer_selected]
@@ -682,26 +796,30 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
         else:
             n_json_files_found_txt = f"{len(json_options)} annotated files found"
         sub0_timelapse.print()
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT", {"font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {}, *updates_disable_ret, no_update
+        # old version -> no changes allowed while reviewing existing annotations
+        # return (False, "", n_json_files_found_txt, json_options,
+        #         json_options[0]["value"] if len(json_options) > 0 else "", 'CONFIRM SAVED OUTPUT', "DISCARD SAVED OUTPUT",
+        #         {"font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {},
+        #         *updates_disable_ret, no_update, {})
+        return (False, "", n_json_files_found_txt, json_options,
+                json_options[0]["value"] if len(json_options) > 0 else "", 'OVERWRITE AND CONFIRM ANNOTATIONS', "DISCARD SAVED ANNOTATIONS",
+                {"font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {},
+                *updates_disable_ret, no_update, {})
     elif mode == "review":
         # load list of json that were already annotated
-        annotated_json_filenames = os.listdir(os.path.join(json_rootdirectory, "output_jsons"))
-        confirmed_json_filenames = os.listdir(os.path.join(json_rootdirectory, "confirmed_jsons"))
+        annotated_json_filenames = get_list_of_annotated_json_files(only_confirmed=False)
+        confirmed_json_filenames = get_list_of_annotated_json_files(only_confirmed=True)
         # filter them out from the full list
         tmp_json_list = [e for e in full_json_list if (e["json_filename"] in annotated_json_filenames) and (e["json_filename"] in confirmed_json_filenames)]
         # annotate exclude/doubtful
-        reviewers_list = ["(all)", ]
-        for json_info in tmp_json_list:
-            with open(os.path.join(json_rootdirectory, "confirmed_jsons", json_info["json_filename"]), "r") as f:
-                saved_output_data = json.load(f)
-            json_info["doubtful"] = saved_output_data["doubtful"]
-            json_info["exclude"] = saved_output_data["exclude"]
-            # check annotator and retain list
-            json_info["confirmed_by"] = saved_output_data["confirmed_by"]
-            if saved_output_data["confirmed_by"] not in reviewers_list:
-                reviewers_list.append(saved_output_data["confirmed_by"])
+        tmp_json_list, reviewers_list = parse_doubtul_excluded_files_and_reviewers_list(tmp_json_list=tmp_json_list, mode=mode)
+        if "de_only" in de_only_checkbox:
+            tmp_json_list = [e for e in tmp_json_list if (e["doubtful"] or e["exclude"])]
         if (reviewer_selected == "") or reviewer_selected not in reviewers_list:
-            reviewer_selected = "(all)"  # default -> (all)
+            if "Master 1" in reviewers_list:
+                reviewer_selected = "Master 1"  # default -> Master 1, then (all)
+            else:
+                reviewer_selected = "(all)"  # default -> (all)
         # keep only selected reviewers
         if reviewer_selected != "(all)":
             tmp_json_list = [e for e in tmp_json_list if e["confirmed_by"] == reviewer_selected]
@@ -710,7 +828,10 @@ def save_and_update_json_files_list(loading_value, n_clicks_save, n_clicks_disca
         # send back
         n_json_files_found_txt = f"{len(json_options)} confirmed files found"
         sub0_timelapse.print()
-        return False, "", n_json_files_found_txt, json_options, json_options[0]["value"] if len(json_options) > 0 else "", '', "DISCARD SAVED OUTPUT", {"display": 'none', "font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {}, *updates_disable_ret, no_update
+        return (False, "", n_json_files_found_txt, json_options,
+                json_options[0]["value"] if len(json_options) > 0 else "", '', "DISCARD ALL ANNOTATIONS",
+                {"display": 'none', "font-weight": "bold"}, {}, reviewers_list, reviewer_selected, {},
+                *updates_disable_ret, no_update, {})
 
 
 @callback(
@@ -754,9 +875,7 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
         comments_checkbox = []  # reset comments
         if mode in ('confirm', 'review'):
             # load previous output
-            load_dir = "output_jsons" if (mode == "confirm") else "confirmed_jsons"
-            with open(os.path.join(json_rootdirectory, load_dir, json_filename), "r") as f:
-                saved_output_data = json.load(f)
+            saved_output_data = load_json_data(json_filename=json_filename, mode=mode)
             rows = saved_output_data["peak_data"]
             if saved_output_data["doubtful"]:
                 comments_checkbox.append("Doubtful")
@@ -780,20 +899,12 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
         peak_data = None
 
     # load input data
-    if mode == "annotate":
-        # load input data without any annotations
-        with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
-            sample_data = json.load(f)
-    elif mode in ('confirm', 'review'):
-        if saved_output_data is not None:
-            sample_data = saved_output_data
-        else:
-            # load annotated output file
-            load_dir = "output_jsons" if (mode == "confirm") else "confirmed_jsons"
-            with open(os.path.join(json_rootdirectory, load_dir, json_filename), "r") as f:
-                sample_data = json.load(f)
+    if saved_output_data is not None:
+        # reuse
+        sample_data = saved_output_data
     else:
-        assert False, f"Unknown {mode=}"
+        # load annotated output file
+        sample_data = load_json_data(json_filename=json_filename, mode=mode)
 
     comments_paragraph_list = []
     for com_field, com_prefix in zip(["short_comments", "long_comments", "patient_other_short_comments", "patient_other_long_comments"],
@@ -816,8 +927,7 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
         comments_paragraph_list.append(comments_paragraph)
 
     # load spectr data
-    with open(os.path.join(json_rootdirectory, "spectr_jsons", json_filename), "r") as f:
-        sample_spectr_data = json.load(f)
+    sample_spectr_data = load_spectr_data(json_filename=json_filename)
     spectr_elp_preds = np.array(sample_spectr_data["elp_spep_s_predictions"])
 
     doubtful = "Doubtful" in comments_checkbox
@@ -852,10 +962,8 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
             new_trace = {}
         traces.append(new_trace)
 
-    if os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename)):
-        with open(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename), "r") as f:
-            previous_sample_data = json.load(f)
-
+    previous_sample_data = load_previous_2020_annotations(json_filename=json_filename)
+    if previous_sample_data is not None:
         old_lemans_class_ = previous_sample_data["groundtruth_class"]
         old_lemans_text = html.Span(f"Previous (2020) data exists: {old_lemans_class_}", style={"color": "red"})
         lemans_button_style = dict()
@@ -887,8 +995,7 @@ def fill_peak_rows(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_f
             rows = []
 
             # load spectr data
-            with open(os.path.join(json_rootdirectory, "spectr_jsons", json_filename), "r") as f:
-                sample_spectr_data = json.load(f)
+            sample_spectr_data = load_spectr_data(json_filename=json_filename)
             # extract prediction map
             spectr_elp_preds = np.array(sample_spectr_data["elp_spep_s_predictions"])
             # # clean and get predicted positions
@@ -913,8 +1020,7 @@ def fill_peak_rows(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_f
                 rows.append({'start': start, 'end': end, 'hc': "", 'lc': ""})
 
             # try to automatically populate HC and LC (if only 1 type of HC and LC mentioned in the comments) new 30_07_2025
-            with open(os.path.join(json_rootdirectory, "input_jsons", json_filename), "r") as f:
-                sample_data = json.load(f)
+            sample_data = load_json_data(json_filename, mode="annotate")
 
             comments = sample_data["short_comments"] + " " + sample_data["long_comments"]
             found_hc, found_lc = look_for_hc_lc_in_comments(comments)
@@ -930,10 +1036,8 @@ def fill_peak_rows(add_n_clicks, spectr_n_clicks, previous_2020_n_clicks, json_f
         if ctx.triggered_id == "previous-2020-to-peaks-button":  # we changed the json file => reset peaks
             rows = []
 
-            if os.path.exists(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename)):
-
-                with open(os.path.join(json_rootdirectory, "previous_2020_output_jsons", json_filename), "r") as f:
-                    previous_sample_data = json.load(f)
+            previous_sample_data = load_previous_2020_annotations(json_filename=json_filename)
+            if previous_sample_data is not None:
 
                 for isotype in ["IgG", "IgA", "IgM", "K", "L"]:
                     iso_trace = np.array(previous_sample_data["groundtruth_maps"][isotype])
