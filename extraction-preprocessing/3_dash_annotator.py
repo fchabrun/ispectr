@@ -19,7 +19,9 @@ if STORE_H5:
     import h5py
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
-root_paths = [r"C:\Users\flori", r"C:\Users\f.chabrun", ]
+root_paths = [r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data",
+              r"C:\Users\f.chabrun\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data",
+              r"C:\Users\Minion3\Documents\iSPECTR\data", ]
 valid_root_path = False
 for root_path in root_paths:
     if os.path.exists(root_path):
@@ -28,9 +30,9 @@ for root_path in root_paths:
 assert valid_root_path, "Unable to find data location"
 
 # LE MANS 2025:
-json_rootdirectory = os.path.join(root_path, r"OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\lemans\preannotation")
+json_rootdirectory = os.path.join(root_path, r"2025\lemans\preannotation")
 # CAPE TOWN 2025:
-# json_rootdirectory = os.path.join(root_path, r"OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\capetown\preannotation")
+# json_rootdirectory = os.path.join(root_path, r"2025\capetown\preannotation")
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 # if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
