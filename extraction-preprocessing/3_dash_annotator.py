@@ -7,7 +7,12 @@ from dash import Dash, html, dcc, callback, Output, Input, State, dash_table, ct
 import plotly.express as px
 import pandas as pd
 import os
-import ujson as json
+try:
+    import ujson as json
+    print("imported ujson as json")
+except:
+    print(f"ujson not found, importing json instead")
+    import json
 import numpy as np
 from datetime import datetime, timedelta
 import re
