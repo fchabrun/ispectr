@@ -42,7 +42,7 @@ assert valid_root_path, "Unable to find data location"
 # json_rootdirectory = os.path.join(root_path, r"2025\lemans\preannotation")
 # SECOND REVIEW (inconsistent samples only)
 # TODO
-json_rootdirectory = os.path.join(root_path, r"2025_12_10\lemans\preannotation\de")
+json_rootdirectory = os.path.join(root_path, r"2025\2025_12_10\de")
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 # if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
@@ -354,7 +354,7 @@ sidebar = html.Div(
             html.P(id="long-comments-text"),
             html.P(id="other-short-comments-text"),
             html.P(id="other-long-comments-text"),
-        ], style={"overflow-y": "auto", "height": "32rem"}),
+        ], style={"overflow-y": "auto", "height": "20rem"}),
     ],
     style=SIDEBAR_STYLE,
 )
