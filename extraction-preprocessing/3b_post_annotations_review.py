@@ -125,7 +125,9 @@ for json_filename in tqdm(os.listdir(os.path.join(json_rootdirectory, "input_jso
             antibodies_found[f"LC_{e['lc']}"] = True
     antibodies_found = {f"Research_{k}": v for k, v in antibodies_found.items()}
 
-    annotations.append({'aaid': json_filename, **antibodies_mentioned, **antibodies_found, 'Pre2020Difference': any_diff})
+    annotations.append({'aaid': json_filename, **antibodies_mentioned, **antibodies_found,
+                        'Pre2020Difference': any_diff,
+                        'Doubtful': sample_data['doubtful'], 'Exclude': sample_data['exclude']})
 
 annotations = pd.DataFrame(annotations)
 
@@ -161,19 +163,28 @@ for hc in ["IgG", "IgA", "IgM", "LC"]:
 list_of_potential_false_positives = list(set(list_of_potential_false_positives))
 len(list_of_potential_false_positives)  # 1488
 
+# list doubtful/to exclude
+list_of_de = annotations[annotations.Doubtful | annotations.Exclude].aaid.tolist()
+list_of_de = list(set(list_of_de))
+len(list_of_de) # 842
+
 # 4th make unique
 list_of_potential_false_positives = [e for e in list_of_potential_false_positives if (e not in list_of_potential_false_negatives) and (e not in list_of_different_from_2020)]
 list_of_potential_false_negatives = [e for e in list_of_potential_false_negatives if e not in list_of_different_from_2020]
+list_of_de = [e for e in list_of_de if e not in list_of_potential_false_positives]
+list_of_de = [e for e in list_of_de if e not in list_of_potential_false_negatives]
+list_of_de = [e for e in list_of_de if e not in list_of_different_from_2020]
 
 len(list_of_different_from_2020)  # 107
 len(list_of_potential_false_negatives)  # 459
 len(list_of_potential_false_positives)  # 810
+len(list_of_de)  # 347
 
 # COPY TO NEW FOLDER
 review_output_path = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\2025_12_10"
 
-for json_list_name, json_list in zip(['vs2020', 'false_negatives', 'false_positives'],
-                                     [list_of_different_from_2020, list_of_potential_false_negatives, list_of_potential_false_positives]):
+for json_list_name, json_list in zip(['vs2020', 'false_negatives', 'false_positives', 'de'],
+                                     [list_of_different_from_2020, list_of_potential_false_negatives, list_of_potential_false_positives, list_of_de]):
     for json_folder in ['input_jsons', 'confirmed_jsons', 'output_jsons', 'previous_2020_output_jsons', 'spectr_jsons']:
         os.makedirs(os.path.join(review_output_path, json_list_name, json_folder), exist_ok=True)
         for json_filename in tqdm(json_list, desc=f"Processing {json_list_name}/{json_folder}"):

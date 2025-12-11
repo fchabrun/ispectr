@@ -34,10 +34,15 @@ for root_path in root_paths:
         break
 assert valid_root_path, "Unable to find data location"
 
-# LE MANS 2025:
-json_rootdirectory = os.path.join(root_path, r"2025\lemans\preannotation")
 # CAPE TOWN 2025:
 # json_rootdirectory = os.path.join(root_path, r"2025\capetown\preannotation")
+
+# FIRST REVIEW
+# LE MANS 2025:
+# json_rootdirectory = os.path.join(root_path, r"2025\lemans\preannotation")
+# SECOND REVIEW (inconsistent samples only)
+# TODO
+json_rootdirectory = os.path.join(root_path, r"2025_12_10\lemans\preannotation\de")
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 # if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
@@ -545,7 +550,7 @@ def save_output_data(json_content, mode, reviewer_id):
         if mode == "annotate":
             json_content["annotated_by"] = reviewer_id
             json_content["annotated_at"] = f"{datetime.now()}"
-            # TODO not working anymore
+            # not working anymore
             fn = os.path.join(json_rootdirectory, "output_jsons", json_content['aaid'] + ".json")
             print(f"saving to {fn}")
             with open(fn, 'w') as f:
