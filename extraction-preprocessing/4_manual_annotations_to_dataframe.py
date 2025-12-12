@@ -1,7 +1,6 @@
 import shutil
 import pandas as pd
 import os
-# import ujson as json
 import json
 import numpy as np
 from datetime import datetime, timedelta
@@ -20,8 +19,7 @@ for root_path in root_paths:
 assert valid_root_path, "Unable to find data location"
 
 # LE MANS 2025:
-# json_rootdirectory = os.path.join(root_path, r"2025\lemans\preannotation")
-json_rootdirectory = os.path.join(root_path, r"2025\2025_12_09\lemans\preannotation")
+json_rootdirectory = os.path.join(root_path, r"2025\final_json_annotations\2025_12_13\lemans")
 
 
 def load_json_data(json_filename, mode):
@@ -83,19 +81,23 @@ def compile_annotations_into_dataframe(period):
         assert False, f"Period {period} not recognized"
 
     for json_filename in tqdm(os.listdir(os.path.join(json_rootdirectory, subdir))):
+        # open json metadata
+        item_annotations = {'AAID': json_filename, 'Doubtful': '', 'Exclude': ''}
         if period == "new":
             try:  # first fetch any confirmed annotations
                 json_data = load_json_data(json_filename=json_filename, mode="review")
             except FileNotFoundError:  # if unavailable use unconfirmed annotations
                 json_data = load_json_data(json_filename=json_filename, mode="confirm")
             peak_data = json_data['peak_data']
+            item_annotations['Doubtful'] = json_data['doubtful']
+            item_annotations['Exclude'] = json_data['exclude']
         elif period == "pre2020":
             json_data = load_previous_2020_annotations(json_filename=json_filename)
             peak_data = prev_annotations_to_rows(json_data)
 
+        # read isotype data
         isotypes = [f"{e['hc']}_{e['lc']}" if (len(e['hc']) > 1) else f"LC_{e['lc']}" for e in peak_data]
         unique_isotypes = list(set(isotypes))
-        annotation_summary = "?"
         if len(unique_isotypes) == 0:
             annotation_summary = "Negative"
         elif len(unique_isotypes) == 1:
@@ -107,17 +109,16 @@ def compile_annotations_into_dataframe(period):
                 n_isotype = sum([1 for e in isotypes if e == isotype])
                 annotation_summary.append(f"{n_isotype}x{isotype}")
             annotation_summary = ",".join(annotation_summary)
+        # store
+        item_annotations['Annotation_summary'] = annotation_summary
 
-        item_annotations = {'Annotation_summary': annotation_summary}
-        annotations.append({'aaid': json_filename, **item_annotations})
+        # save
+        annotations.append(item_annotations)
 
     annotations = pd.DataFrame(annotations)
 
     return annotations
 
-
-old_data = compile_annotations_into_dataframe(period="pre2020")
-new_data = compile_annotations_into_dataframe(period="new")
 
 def simplify_annotation_summary(s):
     if s == 'Negative':
@@ -128,39 +129,45 @@ def simplify_annotation_summary(s):
         return s[:3]
     return 'Complex/biclonal'
 
+
+old_data = compile_annotations_into_dataframe(period="pre2020")
+new_data = compile_annotations_into_dataframe(period="new")
+
 old_data['Annotation_simple'] = old_data.Annotation_summary.apply(simplify_annotation_summary)
 new_data['Annotation_simple'] = new_data.Annotation_summary.apply(simplify_annotation_summary)
 
-old_data.Annotation_simple.value_counts()
-# Annotation_simple
-# IgG                 1038
-# IgM                  405
-# IgA                  156
-# Complex/biclonal      73
-# Negative              52
+def print_count_stats(df_to_process, column):
+    print(pd.concat([df_to_process[column].value_counts(),
+               (100 * df_to_process[column].value_counts(normalize=True)).round(1)], axis=1).apply(lambda row: f"n={row[0]:.0f} ({row[1]}%)", axis=1))
 
-(100 * old_data.Annotation_simple.value_counts() / len(old_data)).round(1)
-# Annotation_simple
-# IgG                 60.2
-# IgM                 23.5
-# IgA                  9.0
-# Complex/biclonal     4.2
-# Negative             3.0
 
-new_data.Annotation_simple.value_counts()
-# Annotation_simple
-# IgG                 3295
-# IgM                 1092
-# IgA                  565
-# LC                    45
-# Negative             489
-# Complex/biclonal     360
+print_count_stats(old_data, "Annotation_simple")
+# IgG                 n=1038 (60.2%)
+# IgM                  n=405 (23.5%)
+# IgA                   n=156 (9.0%)
+# Complex/biclonal       n=73 (4.2%)
+# Negative               n=52 (3.0%)
 
-(100 * new_data.Annotation_simple.value_counts() / len(new_data)).round(1)
-# Annotation_simple
-# IgG                 56.4
-# IgM                 18.7
-# IgA                  9.7
-# Negative             8.4
-# Complex/biclonal     6.2
-# LC                   0.8
+print_count_stats(new_data, "Annotation_simple")
+# IgG                 n=3296 (56.4%)
+# IgM                 n=1094 (18.7%)
+# IgA                   n=569 (9.7%)
+# Negative              n=476 (8.1%)
+# Complex/biclonal      n=364 (6.2%)
+# LC                     n=47 (0.8%)
+
+# some stats about doubtful/to exclude
+print_count_stats(new_data, "Doubtful")
+# Doubtful
+# False    n=5007 (85.6%)
+# True      n=839 (14.4%)
+
+print_count_stats(new_data, "Exclude")
+# Exclude
+# False    n=5842 (99.9%)
+# True         n=4 (0.1%)
+
+# export the df for further analysis
+old_data.to_excel(r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\m1\old_data.xlsx")
+new_data.to_excel(r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\m1\new_data.xlsx")
+

@@ -35,14 +35,13 @@ for root_path in root_paths:
 assert valid_root_path, "Unable to find data location"
 
 # CAPE TOWN 2025:
-# json_rootdirectory = os.path.join(root_path, r"2025\capetown\preannotation")
+json_rootdirectory = os.path.join(root_path, r"2025\preannotation\2025_12_09\capetown\preannotation")
 
 # FIRST REVIEW
 # LE MANS 2025:
 # json_rootdirectory = os.path.join(root_path, r"2025\lemans\preannotation")
 # SECOND REVIEW (inconsistent samples only)
-# TODO
-json_rootdirectory = os.path.join(root_path, r"2025\2025_12_10\de")
+# json_rootdirectory = os.path.join(root_path, r"2025\2025_12_10\de")
 
 # OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA = False
 # if OVERWRITE_OUTPUT_JSON_WITH_NEW_INPUT_DATA:
@@ -491,7 +490,7 @@ def look_for_hc_lc_in_comments(comments, hc_keys="(IgG|IgA|IgM)", lc_keys="([kK]
     return found_hc, found_lc
 
 
-def qc_peak_info(rows, MIN_PEAK_POS=150, MAX_PEAK_POS=299):
+def qc_peak_info(rows, MIN_PEAK_POS=140, MAX_PEAK_POS=299):
     # make sure types are OK
     for row in rows:
         row["start"] = int(row["start"])  # make sure peak locators are numeric
@@ -922,7 +921,9 @@ def update_graph(json_filename, rows, comments_checkbox, mode):
     comments_paragraph_list = []
     for com_field, com_prefix in zip(["short_comments", "long_comments", "patient_other_short_comments", "patient_other_long_comments"],
                              ["(SPEP)", "(IT)", "(PAID SPEP)", "(PAID IT)"]):
-        comments_text = sample_data[com_field]
+        comments_text = None
+        if com_field in sample_data.keys():
+            comments_text = sample_data[com_field]
 
         if comments_text is None:
             comments_text = "---No data---"
