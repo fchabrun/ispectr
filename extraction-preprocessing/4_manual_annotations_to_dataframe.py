@@ -167,7 +167,8 @@ print_count_stats(new_data, "Exclude")
 # False    n=5842 (99.9%)
 # True         n=4 (0.1%)
 
-# export the df for further analysis
-old_data.to_excel(r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\m1\old_data.xlsx")
-new_data.to_excel(r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\m1\new_data.xlsx")
+# merge both
+final_data = new_data.merge(old_data[['AAID', 'Annotation_summary', 'Annotation_simple']].rename(columns={'Annotation_summary': 'OLD_Annotation_summary', 'Annotation_simple': 'OLD_Annotation_simple'}), how="left", on="AAID")
 
+# export the df for further analysis
+final_data.to_excel(r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\m1\annotations_extraction.xlsx")
