@@ -3,6 +3,8 @@
 author : Chabrun Floris and Dieu Xavier
 date : 22/11/2024
 Training segmentation models for immunosubtraction data
+This script also runs inference on the validation set of the main center (LM) and export predictions into .npy arrays
+# Those predictions can then be used in the jupyter notebook scripts
 #############################################################################"""
 # general modules
 import os

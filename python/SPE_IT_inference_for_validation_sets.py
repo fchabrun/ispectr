@@ -2,7 +2,8 @@
 #################### SPE IT MODEL TRAINING #####################################
 author : Chabrun Floris and Dieu Xavier
 date : 22/11/2024
-Training segmentation models for immunosubtraction data
+This script is used to perform inference (i.e. export validation predictions) for validation sets (not approached in the training script)
+# Those predictions can then be used in the jupyter notebook scripts
 #############################################################################"""
 
 # general modules
