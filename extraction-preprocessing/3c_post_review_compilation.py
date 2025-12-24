@@ -14,32 +14,15 @@ for root_path in root_paths:
 assert valid_root_path, "Unable to find data location"
 
 # input folders
-# TODO: not all CAPE TOWN annotations were COMPLETED yet!
-# CAPETOWN_FOLDER = os.path.join(root_path, r"2025\preannotation\2025_12_09\capetown\preannotation")
 LEMANS_DOUBLEREVIEW_rootfolder = os.path.join(root_path, r"2025\preannotation\2025_12_12")
 LEMANS_SINGLEREVIEW_folder = os.path.join(root_path, r"2025\preannotation\2025_12_09\lemans\preannotation")
+# CAPE TOWN -> no need, because we did not confirm anything
+# so we can just copy paste the content of the 2025/12/24 folder into the final json folder
 
 # output folders
-# CAPETOWN_OUTPUT_FOLDER = os.path.join(root_path, r"2025\final_json_annotations\2025_12_13\capetown")
 LEMANS_OUTPUT_FOLDER = os.path.join(root_path, r"2025\final_json_annotations\2025_12_13\lemans")
 for folder in ["input_jsons", "output_jsons", "confirmed_jsons", "spectr_jsons", "previous_2020_output_jsons"]:
-    # if folder != "previous_2020_output_jsons":
-        # os.makedirs(os.path.join(CAPETOWN_OUTPUT_FOLDER, folder), exist_ok=True)
     os.makedirs(os.path.join(LEMANS_OUTPUT_FOLDER, folder), exist_ok=True)
-
-# parse all files and copy/paste
-# n = 0
-# for json_filename in tqdm(os.listdir(os.path.join(CAPETOWN_FOLDER, "input_jsons"))):
-#     # check annotations exist
-#     assert os.path.exists(os.path.join(CAPETOWN_FOLDER, "output_jsons", json_filename)), f"No annotations found for {json_filename=}"
-#     # copy/paste
-#     for folder in ["input_jsons", "output_jsons", "confirmed_jsons", "spectr_jsons", "previous_2020_output_jsons"]:
-#         input_fp = os.path.join(CAPETOWN_FOLDER, folder, json_filename)
-#         if os.path.exists(input_fp):
-#             shutil.copy(src=input_fp,
-#                         dst=os.path.join(CAPETOWN_OUTPUT_FOLDER, folder, json_filename))
-#     n += 1
-# print(f"Successfully copied files for {n} CAPE TOWN samples")
 
 # le mans
 

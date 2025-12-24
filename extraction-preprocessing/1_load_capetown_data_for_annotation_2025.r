@@ -9,7 +9,7 @@ library(gridExtra)
 library(progress)
 
 base_data_path = "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/cameron_may_2024/is_data_xlsx"
-output_data_path = "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/proc"
+# output_data_path = "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/proc"
 
 found_db_files <- list.files(base_data_path)
 print(paste0("Found ", length(found_db_files), " files in base directory"))
@@ -115,6 +115,8 @@ print(paste(colnames(global_is_data), collapse=", "))
 annot_path = "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/cameron_may_2024/processed_IFE_reports.xlsx"
 annots = read.xlsx(annot_path)
 
+print(paste0("Annotation file contains ", nrow(annots), " valid entries for ", length(unique(annots$episode)), " unique episodes"))
+
 post_process_ab_names <- function(s) {
   s <- gsub("[][']+", "", s)
   s <- gsub("-+", " ", s)
@@ -127,7 +129,8 @@ post_process_ab_names <- function(s) {
 }
 
 # create input json files
-input_json_directory <- "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/2025/capetown/preannotation/input_jsons"
+input_json_directory <- "C:/Users/flori/OneDrive - univ-angers.fr/Documents/Home/Research/SPECTR/ISPECTR/data/2025/preannotation/2025_12_24/capetown/input_jsons"
+dir.create(input_json_directory, recursive = TRUE)
 
 for (data_position in 1:nrow(global_is_data)) {
   aaid <- global_is_data$id_unique[data_position]
@@ -155,6 +158,9 @@ for (data_position in 1:nrow(global_is_data)) {
     }
     long_comments <- paste(long_comments, ife_comment, sep="\n")
     long_comments <- substr(long_comments, 2, nchar(long_comments))
+  } else {  # no annotations found
+    short_comments = "<NO CAPETOWN ANNNOTATIONS>"
+    long_comments = "<NO CAPETOWN ANNNOTATIONS>"
   }
   
   # metadata

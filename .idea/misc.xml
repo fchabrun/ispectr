@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="py311_torch21gpu_feb25" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="py314_dash_nov25" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="py311_torch21gpu_oct24_statants" project-jdk-type="Python SDK" />
 </project>

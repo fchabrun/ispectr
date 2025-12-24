@@ -35,10 +35,12 @@ for root_path in root_paths:
 assert valid_root_path, "Unable to find data location"
 
 # CAPE TOWN 2025:
-json_rootdirectory = os.path.join(root_path, r"2025\preannotation\2025_12_09\capetown\preannotation")
+# json_rootdirectory = os.path.join(root_path, r"2025\preannotation\2025_12_09\capetown\preannotation")
+# AFTER CORRECTING THE MISSING ANNOTATION JSONS
+json_rootdirectory = os.path.join(root_path, r"2025\preannotation\2025_12_24\capetown")
 
-# FIRST REVIEW
 # LE MANS 2025:
+# FIRST REVIEW
 # json_rootdirectory = os.path.join(root_path, r"2025\lemans\preannotation")
 # SECOND REVIEW (inconsistent samples only)
 # json_rootdirectory = os.path.join(root_path, r"2025\2025_12_10\de")
