@@ -437,7 +437,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode")  # dummy arg => for PyCharm only
     parser.add_argument("--run_mode", type=str, default="auto")  # run_mode=auto will set to training+validation if no ckpt is found, else validation
     parser.add_argument("--model_name", type=str,
-                        default="mednext_B_TEST2025")  # name of the model, will be used to 1) load the right config file and 2) export to a custom new folder
+                        default="mednext_L_TEST2025")  # name of the model, will be used to 1) load the right config file and 2) export to a custom new folder
     parser.add_argument("--data_root_path", type=str,
                         default=None)  # path in which look for the config file // if None, will try to see if local (Floris' or Xavier's PC)
     parser.add_argument("--config_root_path", type=str,
@@ -469,7 +469,7 @@ if __name__ == "__main__":
                 console_verbose = True
                 args.config_root_path = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\ispectr\configs"
                 # args.data_root_path = r"C:\Users\flori\Documents\Home\Research\SPECTR\ISPECTR\data\proc\lemans_2018"  # DEPRECATED
-                args.data_root_path = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\final_datasets\lemans\2025_12_23"
+                args.data_root_path = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\final_datasets\lemans\2025_12_24"
                 args.output_root_path = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\output"
             elif "afors" in os.listdir(r"C:\Users"):  # Xavier
                 console_verbose = True

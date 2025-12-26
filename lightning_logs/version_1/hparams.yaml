@@ -1,0 +1,36 @@
+adam_eps: 1.0e-08
+config: !!python/object:spep_assets.spep_models.MedNeXtConfig
+  block_counts:
+  - 2
+  - 2
+  - 8
+  - 2
+  - 2
+  - 2
+  - 8
+  - 2
+  - 2
+  dec_kernel_size: null
+  deep_supervision: false
+  do_res: true
+  do_res_up_down: true
+  enc_kernel_size: null
+  exp_r: 4
+  grn: false
+  in_channels: 6
+  kernel_size: 7
+  n_channels: 128
+  n_classes: 5
+  neg_slope: 0.01
+  norm_type: group
+lr: 0.0005
+lr_reduceonplateau_factor: 0.5
+lr_reduceonplateau_minlr: 1.0e-06
+lr_reduceonplateau_patience: 5
+lr_reduceonplateau_threshold: 0.01
+lr_scheduler: cosine_with_restarts
+model: !!python/name:spep_assets.spep_models.MedNeXtForIS ''
+num_training_steps: 50000
+num_warmup_steps: 5000
+optimizer: AdamW
+weight_decay: 0.0

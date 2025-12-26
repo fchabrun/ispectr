@@ -22,34 +22,22 @@ from spep_assets.spep_models import pl_IS_model
 
 # loading SA data
 
-df = pd.read_csv(r"C:\Users\afors\Documents\Projects\SPE_IT\data_sa\sa_is_full.csv")
+TEST_DATASET_NAME = "sa_2025"
+TEST_DATA_PATH = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\data\2025\final_datasets\capetown\2025_12_24\full_dataset.csv"
+MODEL_PATH = r"C:\Users\flori\OneDrive - univ-angers.fr\Documents\Home\Research\SPECTR\ISPECTR\output\mednext_L_TEST2025"
 
-spe_range = np.arange(305)
-spe_range = spe_range[1:]
-spe_range_str = list(map(str, spe_range))
+raw_data = pd.read_csv(TEST_DATA_PATH)
+# new: filter out exclude
+raw_data = raw_data[~raw_data.exclude].copy()
 
-sa_elp = df.loc[ : , ['ELP_x'+i for i in spe_range_str]]
-sa_g = df.loc[ : , ['IgG_x'+i for i in spe_range_str]]
-sa_a = df.loc[ : , ['IgA_x'+i for i in spe_range_str]]
-sa_m = df.loc[ : , ['IgM_x'+i for i in spe_range_str]]
-sa_k = df.loc[ : , ['K_x'+i for i in spe_range_str]]
-sa_l = df.loc[ : , ['L_x'+i for i in spe_range_str]]
+X_test = np.stack([raw_data.loc[:, [f'{trace}_{x+1}' for x in np.arange(304)]].values for trace in ['ELP', 'IgG', 'IgA', 'IgM', 'K', 'L']],
+                  axis=-1)
+y_test = np.stack([raw_data.loc[:, [f'segm_{trace}_{x+1}' for x in np.arange(304)]].values for trace in ['IgG', 'IgA', 'IgM', 'K', 'L']],
+                  axis=-1)
+print(f"Loaded X test data of shape {X_test.shape=}")
+print(f"Loaded X test data of shape {y_test.shape=}")
 
-sa_elp = sa_elp.to_numpy()
-sa_g = sa_g.to_numpy()
-sa_a = sa_a.to_numpy()
-sa_m = sa_m.to_numpy()
-sa_k = sa_k.to_numpy()
-sa_l = sa_l.to_numpy()
-
-# we need to create a dataset with shape (batch, spe_length, tracks) i.e. (719,304,6)
-x_test = np.dstack([sa_elp, sa_g, sa_a, sa_m, sa_k, sa_l])
-
-# x_test = np.moveaxis(np.expand_dims(x_test, 2), (0,1,2,3), (0,3,2,1))
-
-
-sa_dataset = ISDataset(if_x=x_test, if_y=np.zeros((719,304,5)), smoothing=False, normalize=False, coarse_dropout=False, permute=None)
-
+sa_dataset = ISDataset(if_x=X_test, if_y=np.zeros((len(X_test), 304, 5)), smoothing=False, normalize=False, coarse_dropout=False, permute=None)
 
 num_workers = 0  # how many processes will load data in parallel; 0 for none
 
@@ -68,19 +56,16 @@ test_loader = data.DataLoader(
 trainer = pl.Trainer()
 
 # loading model from save
-model = pl_IS_model.load_from_checkpoint(r"C:\Users\afors\Documents\Projects\SPE_IT\Best_model\mednext_L\last.ckpt")
+model = pl_IS_model.load_from_checkpoint(os.path.join(MODEL_PATH, "last.ckpt"))
 
 # predict on validation data
-sa_outputs = trainer.predict(model, dataloaders=test_loader)
+test_outputs = trainer.predict(model, dataloaders=test_loader)
 # note: in pytorch, the output is a list of N elements, N being the number of batches => so we have to convert that to a np array
 # new: make sure we are not using logits but probabilities
-sa_preds = torch.nn.Sigmoid()(torch.cat(sa_outputs)).detach().cpu().numpy()
-
-sa_preds.shape
-sa_preds[0,4,:].max() # Ml for the fisrt trace
+test_preds = torch.nn.Sigmoid()(torch.cat(test_outputs)).detach().cpu().numpy()
 
 
-def plot_IT_predictions(idx, sample_x, sample_pred, debug):
+def plot_IT_predictions(idx, sample_x, sample_y, sample_pred, debug):
     plt.figure(figsize=(14, 10))
     plt.subplot(3, 1, 1)
     # on récupère la class map (binarisée)
@@ -95,6 +80,12 @@ def plot_IT_predictions(idx, sample_x, sample_pred, debug):
     # for peak_start, peak_end in zip(np.where(np.diff(class_map)==1)[0]+1, np.where(np.diff(class_map)==-1)[0]+1):
     #     plt.plot(np.arange(peak_start,peak_end), curve_values[peak_start:peak_end], '-', color = 'red')
 
+    plt.subplot(3, 1, 2)
+    for num, col, lab in zip(range(5), ['purple', 'pink', 'green', 'red', 'blue'], ['G', 'A', 'M', 'k', 'l']):
+        plt.plot(np.arange(0, 304) + 1, sample_y[:, num] / 5 + (4 - num) / 5, '-', color=col, label=lab)
+    plt.ylim(-.05, 1.05)
+    plt.legend()
+    plt.title('Ground truth maps')
 
     plt.subplot(3, 1, 3)
     for num, col, lab in zip(range(5), ['purple', 'pink', 'green', 'red', 'blue'], ['G', 'A', 'M', 'k', 'l']):
@@ -102,6 +93,7 @@ def plot_IT_predictions(idx, sample_x, sample_pred, debug):
     plt.ylim(-.05, 1.05)
     plt.legend()
     plt.title('Predicted maps')
+
     if debug != "inline":
         plt.savefig(os.path.join(debug, f"pred_plot_{idx=}.png"))
         plt.close()
@@ -109,12 +101,14 @@ def plot_IT_predictions(idx, sample_x, sample_pred, debug):
         plt.show()
 
 
-plot_IT_predictions(0, x_test[0, ...], sa_preds[0,...], debug='inline')
-plot_IT_predictions(1, x_test[1, ...], sa_preds[1,...], debug='inline')
-plot_IT_predictions(2, x_test[2, ...], sa_preds[2,...], debug='inline')
-plot_IT_predictions(3, x_test[3, ...], sa_preds[3,...], debug='inline')
-plot_IT_predictions(4, x_test[4, ...], sa_preds[4,...], debug='inline')
+idx = 0
+for idx in range(5):
+    plot_IT_predictions(idx,
+                        sample_x=X_test[idx, ...],
+                        sample_y=y_test[idx, ...],
+                        sample_pred=test_preds[idx, ...],
+                        debug='inline')
 
-np.save(r"C:\Users\afors\Documents\Projects\SPE_IT\output\sa_preds.npy", sa_preds)
-np.save(r"C:\Users\afors\Documents\Projects\SPE_IT\output\sa_x.npy", x_test)
-
+np.save(os.path.join(MODEL_PATH, f"{TEST_DATASET_NAME}_preds.npy"), test_preds)
+np.save(os.path.join(MODEL_PATH, f"{TEST_DATASET_NAME}_truth.npy"), y_test)
+np.save(os.path.join(MODEL_PATH, f"{TEST_DATASET_NAME}_x.npy"), X_test)

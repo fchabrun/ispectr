@@ -2,7 +2,7 @@
 	"architecture": "mednext",
 	"architecture_config": {
 			"in_channels" : 6,
-            "n_channels" :  96,
+            "n_channels" :  128,
             "n_classes" : 5,
             "exp_r" : 4,
             "kernel_size" : 7,
